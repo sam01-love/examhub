@@ -1,0 +1,6 @@
+{
+  "name": "EXAMHUB - JAMB, WAEC & Post-UTME Exam Prep Platform",
+  "description": "Standard MCQ CBT exam simulator, syllabus guide, interactive reading mode with video input, practice tests, results analytics, and live news for Nigerian secondary school students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
