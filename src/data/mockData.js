@@ -1,0 +1,887 @@
+// ---------------------------------------------------------------------------
+// JAMB is sat as a combination of the Use of English (compulsory for every
+// candidate) plus three subjects drawn from the candidate's chosen stream.
+// ExamHub organises practice around that reality: pick a stream, then one of
+// its four standard subjects, then practice. Swap `questionBank` for a
+// Supabase `questions` table query once real bank content is ready — the
+// shape (id, prompt, instruction, options, answer, explanation) is designed
+// to map directly onto a table with those columns.
+// ---------------------------------------------------------------------------
+
+// Every stream is compulsory-English plus 3 electives picked from a 4-subject
+// pool (e.g. Science: pick 3 of Mathematics/Biology/Physics/Chemistry). This
+// mirrors how JAMB combinations actually work — some subjects are optional
+// alternatives (Biology vs Mathematics for non-engineering science students).
+export const streams = [
+  {
+    id: 'science',
+    name: 'Science',
+    tagline: 'Engineering, medicine & pure sciences',
+    description: 'For candidates targeting Medicine, Engineering, Computer Science and related courses.',
+    icon: 'FlaskConical',
+    compulsory: 'english',
+    electivePool: ['mathematics', 'biology', 'physics', 'chemistry'],
+    electivesRequired: 3,
+    subjectIds: ['english', 'physics', 'chemistry', 'mathematics'],
+  },
+  {
+    id: 'arts',
+    name: 'Arts',
+    tagline: 'Humanities, law & mass communication',
+    description: 'For candidates targeting Law, Mass Communication, Languages and related courses.',
+    icon: 'Landmark',
+    compulsory: 'english',
+    electivePool: ['literature', 'government', 'crs', 'history'],
+    electivesRequired: 3,
+    subjectIds: ['english', 'literature', 'government', 'crs'],
+  },
+  {
+    id: 'commercial',
+    name: 'Commercial',
+    tagline: 'Business, accounting & economics',
+    description: 'For candidates targeting Accounting, Business Admin, Economics and related courses.',
+    icon: 'Briefcase',
+    compulsory: 'english',
+    electivePool: ['mathematics', 'economics', 'commerce', 'government'],
+    electivesRequired: 3,
+    subjectIds: ['english', 'mathematics', 'economics', 'commerce'],
+  },
+]
+
+export const subjectMeta = {
+  english: { name: 'Use of English', short: 'English', color: 'blue' },
+  mathematics: { name: 'Mathematics', short: 'Maths', color: 'indigo' },
+  biology: { name: 'Biology', short: 'Biology', color: 'lime' },
+  physics: { name: 'Physics', short: 'Physics', color: 'sky' },
+  chemistry: { name: 'Chemistry', short: 'Chemistry', color: 'green' },
+  literature: { name: 'Literature-in-English', short: 'Literature', color: 'rose' },
+  government: { name: 'Government', short: 'Government', color: 'amber' },
+  crs: { name: 'Christian Religious Studies', short: 'CRS', color: 'purple' },
+  history: { name: 'History', short: 'History', color: 'yellow' },
+  economics: { name: 'Economics', short: 'Economics', color: 'teal' },
+  commerce: { name: 'Commerce', short: 'Commerce', color: 'orange' },
+}
+
+export const targetScores = ['180+', '200+', '250+', '300+', '350+']
+
+// ---------------------------------------------------------------------------
+// Real JAMB question counts: Use of English is 60 questions, every other
+// subject is 40. Scoring is normalised to 100 marks per subject regardless of
+// question count, so 4 subjects sum to a final result out of 400.
+// ---------------------------------------------------------------------------
+export const QUESTION_TARGETS = { english: 60 }
+export const DEFAULT_QUESTION_TARGET = 40
+export const MARKS_PER_SUBJECT = 100
+export const EXAM_DURATION_MINUTES = 120
+
+export function getQuestionTarget(subjectId) {
+  return QUESTION_TARGETS[subjectId] ?? DEFAULT_QUESTION_TARGET
+}
+
+// Cycles through the (small) mock question bank to fill the real subject
+// question count, tagging each question with its subject and a unique id.
+export function buildQuestionSet(subjectId, count) {
+  const bank = questionBank[subjectId] || []
+  if (!bank.length) return []
+  const target = count ?? getQuestionTarget(subjectId)
+  const set = []
+  for (let i = 0; i < target; i++) {
+    const base = bank[i % bank.length]
+    set.push({ ...base, subjectId, uid: `${subjectId}-${i}` })
+  }
+  return set
+}
+
+// A small, original bank of JAMB-standard practice questions for every
+// subject across the three streams. Each subject currently ships with 8
+// questions; extend or replace per subject as the real content library grows.
+export const questionBank = {
+  english: [
+    {
+      id: 'eng-1',
+      instruction: 'Vocabulary — choose the word nearest in meaning',
+      prompt: 'The manager was too diligent to overlook the error in the report.',
+      options: ['Careless', 'Hardworking', 'Forgetful', 'Impatient'],
+      answer: 1,
+      explanation: '"Diligent" describes someone who works with care and steady effort, so "hardworking" is nearest in meaning.',
+    },
+    {
+      id: 'eng-2',
+      instruction: 'Antonyms — choose the word opposite in meaning',
+      prompt: 'Choose the word most opposite in meaning to "scarce".',
+      options: ['Rare', 'Abundant', 'Costly', 'Hidden'],
+      answer: 1,
+      explanation: '"Scarce" means in short supply; its opposite is "abundant", meaning present in large quantities.',
+    },
+    {
+      id: 'eng-3',
+      instruction: 'Grammar — select the option that best completes the sentence',
+      prompt: 'Neither the students nor the teacher ___ aware of the change in schedule.',
+      options: ['were', 'was', 'are', 'have been'],
+      answer: 1,
+      explanation: 'With "neither...nor", the verb agrees with the subject nearer to it — "the teacher" is singular, so "was" is correct.',
+    },
+    {
+      id: 'eng-4',
+      instruction: 'Idioms — choose the correct meaning',
+      prompt: 'What does it mean to "let the cat out of the bag"?',
+      options: ['To free an animal', 'To reveal a secret accidentally', 'To cause confusion', 'To lose something valuable'],
+      answer: 1,
+      explanation: 'The idiom "let the cat out of the bag" means to accidentally reveal a secret.',
+    },
+    {
+      id: 'eng-5',
+      instruction: 'Collective nouns — choose the correct word',
+      prompt: 'Choose the correct collective noun to complete: "A ___ of lions crossed the savannah."',
+      options: ['flock', 'pride', 'herd', 'school'],
+      answer: 1,
+      explanation: 'A group of lions is called a "pride".',
+    },
+    {
+      id: 'eng-6',
+      instruction: 'Spelling — choose the correctly spelt word',
+      prompt: 'Which of the following is spelt correctly?',
+      options: ['Ocassion', 'Occassion', 'Occasion', 'Occation'],
+      answer: 2,
+      explanation: '"Occasion" is the correct spelling, with a double "c" and a single "s".',
+    },
+    {
+      id: 'eng-7',
+      instruction: 'Prepositions — select the correct option',
+      prompt: 'She is married ___ a civil engineer.',
+      options: ['with', 'to', 'by', 'for'],
+      answer: 1,
+      explanation: 'The correct preposition to use with "married" in this context is "to": "married to".',
+    },
+    {
+      id: 'eng-8',
+      instruction: 'Reading comprehension — draw the correct inference',
+      prompt: 'A student who "crammed all night before the exam" most likely means the student:',
+      options: [
+        'Studied calmly over several weeks',
+        'Memorised material hurriedly at the last minute',
+        'Skipped the exam entirely',
+        'Taught the material to classmates',
+      ],
+      answer: 1,
+      explanation: 'To "cram" means to study intensively and hurriedly within a short period, typically just before a test.',
+    },
+  ],
+
+  mathematics: [
+    {
+      id: 'math-1',
+      instruction: 'Number bases',
+      prompt: 'Convert 101101₂ to base 10.',
+      options: ['43', '44', '45', '46'],
+      answer: 2,
+      explanation: '101101₂ = (1×32)+(0×16)+(1×8)+(1×4)+(0×2)+(1×1) = 32+8+4+1 = 45.',
+    },
+    {
+      id: 'math-2',
+      instruction: 'Indices',
+      prompt: 'Simplify: (2³ × 2⁴) ÷ 2⁵',
+      options: ['2', '4', '8', '16'],
+      answer: 1,
+      explanation: 'Using laws of indices: 2^(3+4-5) = 2² = 4.',
+    },
+    {
+      id: 'math-3',
+      instruction: 'Logarithms',
+      prompt: 'Given that log₁₀2 = 0.3010, find log₁₀8.',
+      options: ['0.6020', '0.9030', '1.2040', '0.3010'],
+      answer: 1,
+      explanation: 'log₁₀8 = log₁₀2³ = 3 × log₁₀2 = 3 × 0.3010 = 0.9030.',
+    },
+    {
+      id: 'math-4',
+      instruction: 'Sets',
+      prompt: 'In a class of 40 students, 25 like Mathematics, 20 like English, and 10 like both. How many like neither subject?',
+      options: ['3', '5', '8', '10'],
+      answer: 1,
+      explanation: 'Students liking at least one subject = 25 + 20 − 10 = 35. Those liking neither = 40 − 35 = 5.',
+    },
+    {
+      id: 'math-5',
+      instruction: 'Simultaneous equations',
+      prompt: 'If x + y = 7 and x − y = 1, find the value of xy.',
+      options: ['10', '12', '14', '16'],
+      answer: 1,
+      explanation: 'Adding the equations: 2x = 8, so x = 4, and y = 3. Therefore xy = 4 × 3 = 12.',
+    },
+    {
+      id: 'math-6',
+      instruction: 'Quadratic equations',
+      prompt: 'Find the sum of the roots of x² − 5x + 6 = 0.',
+      options: ['3', '5', '6', '−5'],
+      answer: 1,
+      explanation: 'For ax² + bx + c = 0, the sum of roots = −b/a = −(−5)/1 = 5.',
+    },
+    {
+      id: 'math-7',
+      instruction: 'Sequences and series',
+      prompt: 'Find the 10th term of the arithmetic progression 3, 7, 11, 15, ...',
+      options: ['35', '37', '39', '41'],
+      answer: 2,
+      explanation: 'Tₙ = a + (n−1)d = 3 + (10−1)×4 = 3 + 36 = 39.',
+    },
+    {
+      id: 'math-8',
+      instruction: 'Mensuration',
+      prompt: 'Find the area of a circle of radius 7 cm. (Take π = 22/7)',
+      options: ['144 cm²', '150 cm²', '154 cm²', '160 cm²'],
+      answer: 2,
+      explanation: 'Area = πr² = (22/7) × 7 × 7 = 154 cm².',
+    },
+  ],
+
+  physics: [
+    {
+      id: 'phy-1',
+      instruction: 'Units and measurement',
+      prompt: 'What is the SI unit of force?',
+      options: ['Joule', 'Newton', 'Watt', 'Pascal'],
+      answer: 1,
+      explanation: 'Force is measured in newtons (N), defined from Newton\'s second law, F = ma.',
+    },
+    {
+      id: 'phy-2',
+      instruction: 'Current electricity',
+      prompt: 'A current of 2 A flows through a resistor of 5 Ω. Find the voltage across the resistor.',
+      options: ['2.5 V', '7 V', '10 V', '20 V'],
+      answer: 2,
+      explanation: "By Ohm's law, V = IR = 2 × 5 = 10 V.",
+    },
+    {
+      id: 'phy-3',
+      instruction: 'Waves',
+      prompt: 'A wave has a frequency of 50 Hz and a wavelength of 2 m. What is its speed?',
+      options: ['25 m/s', '52 m/s', '100 m/s', '200 m/s'],
+      answer: 2,
+      explanation: 'Speed = frequency × wavelength = 50 × 2 = 100 m/s.',
+    },
+    {
+      id: 'phy-4',
+      instruction: 'Mechanics — Newton\'s laws',
+      prompt: 'A resultant force of 10 N acts on a body of mass 5 kg. Find its acceleration.',
+      options: ['0.5 m/s²', '2 m/s²', '5 m/s²', '15 m/s²'],
+      answer: 1,
+      explanation: 'From F = ma, a = F/m = 10/5 = 2 m/s².',
+    },
+    {
+      id: 'phy-5',
+      instruction: 'Reflection of light',
+      prompt: 'For a plane mirror, the angle of incidence is related to the angle of reflection how?',
+      options: [
+        'The angle of reflection is always twice the angle of incidence',
+        'The angle of reflection equals the angle of incidence',
+        'The angle of reflection is always 90°',
+        'There is no fixed relationship',
+      ],
+      answer: 1,
+      explanation: 'The law of reflection states that the angle of incidence equals the angle of reflection, measured from the normal.',
+    },
+    {
+      id: 'phy-6',
+      instruction: 'Density',
+      prompt: 'A substance has a mass of 20 g and a volume of 4 cm³. Find its density.',
+      options: ['4 g/cm³', '5 g/cm³', '16 g/cm³', '80 g/cm³'],
+      answer: 1,
+      explanation: 'Density = mass/volume = 20/4 = 5 g/cm³.',
+    },
+    {
+      id: 'phy-7',
+      instruction: 'Work, energy and power',
+      prompt: 'Find the kinetic energy of a 2 kg object moving at 3 m/s.',
+      options: ['3 J', '6 J', '9 J', '18 J'],
+      answer: 2,
+      explanation: 'KE = ½mv² = ½ × 2 × 3² = ½ × 2 × 9 = 9 J.',
+    },
+    {
+      id: 'phy-8',
+      instruction: 'Circuits',
+      prompt: 'Two resistors of 4 Ω and 6 Ω are connected in series. Find the total resistance.',
+      options: ['2 Ω', '2.4 Ω', '10 Ω', '24 Ω'],
+      answer: 2,
+      explanation: 'For resistors in series, total resistance = sum of individual resistances = 4 + 6 = 10 Ω.',
+    },
+  ],
+
+  chemistry: [
+    {
+      id: 'chem-1',
+      instruction: 'Periodic table',
+      prompt: 'What is the chemical symbol for sodium?',
+      options: ['So', 'Sd', 'Na', 'S'],
+      answer: 2,
+      explanation: 'Sodium\'s symbol, Na, comes from its Latin name "Natrium".',
+    },
+    {
+      id: 'chem-2',
+      instruction: 'Atomic structure',
+      prompt: 'An atom has 11 protons and 12 neutrons. What is its mass number?',
+      options: ['11', '12', '22', '23'],
+      answer: 3,
+      explanation: 'Mass number = number of protons + number of neutrons = 11 + 12 = 23.',
+    },
+    {
+      id: 'chem-3',
+      instruction: 'Chemical bonding',
+      prompt: 'Which type of bond is formed by the complete transfer of electrons from one atom to another?',
+      options: ['Covalent bond', 'Ionic bond', 'Metallic bond', 'Hydrogen bond'],
+      answer: 1,
+      explanation: 'An ionic bond forms when electrons are transferred completely, producing oppositely charged ions that attract each other.',
+    },
+    {
+      id: 'chem-4',
+      instruction: 'Acids and bases',
+      prompt: 'A solution has a pH of 3. What can be said about the solution?',
+      options: ['It is strongly basic', 'It is neutral', 'It is acidic', 'It has no hydrogen ions'],
+      answer: 2,
+      explanation: 'A pH below 7 indicates an acidic solution; a pH of 3 is strongly acidic.',
+    },
+    {
+      id: 'chem-5',
+      instruction: 'Stoichiometry',
+      prompt: 'What is the molar mass of water, H₂O? (H = 1, O = 16)',
+      options: ['16 g/mol', '17 g/mol', '18 g/mol', '19 g/mol'],
+      answer: 2,
+      explanation: 'Molar mass of H₂O = (2×1) + 16 = 18 g/mol.',
+    },
+    {
+      id: 'chem-6',
+      instruction: 'Separation techniques',
+      prompt: 'Which method is most suitable for separating a mixture of sand and water?',
+      options: ['Distillation', 'Filtration', 'Chromatography', 'Evaporation'],
+      answer: 1,
+      explanation: 'Filtration separates an insoluble solid (sand) from a liquid (water) using a filter medium.',
+    },
+    {
+      id: 'chem-7',
+      instruction: 'Organic chemistry',
+      prompt: 'Which functional group is present in all alcohols?',
+      options: ['-COOH', '-OH', '-CHO', '-NH₂'],
+      answer: 1,
+      explanation: 'Alcohols are characterised by the hydroxyl (-OH) functional group attached to a carbon chain.',
+    },
+    {
+      id: 'chem-8',
+      instruction: 'Gas laws',
+      prompt: 'A fixed mass of gas at constant temperature has its pressure doubled. What happens to its volume?',
+      options: ['It doubles', 'It halves', 'It stays the same', 'It quadruples'],
+      answer: 1,
+      explanation: "By Boyle's law, at constant temperature, pressure and volume are inversely proportional, so doubling pressure halves the volume.",
+    },
+  ],
+
+  biology: [
+    {
+      id: 'bio-1',
+      instruction: 'Cell biology',
+      prompt: 'Which organelle is responsible for aerobic respiration in a cell?',
+      options: ['Nucleus', 'Mitochondrion', 'Ribosome', 'Golgi apparatus'],
+      answer: 1,
+      explanation: 'The mitochondrion is the site of aerobic respiration, producing ATP for the cell.',
+    },
+    {
+      id: 'bio-2',
+      instruction: 'Genetics',
+      prompt: 'In humans, a child with blood group O has parents with blood groups A and B. What does this show about the O allele?',
+      options: ['It is dominant', 'It is recessive', 'It is co-dominant', 'It is sex-linked'],
+      answer: 1,
+      explanation: 'The O allele only shows up when no dominant A or B allele is present, so it is recessive.',
+    },
+    {
+      id: 'bio-3',
+      instruction: 'Classification',
+      prompt: 'Organisms that can manufacture their own food from simple inorganic substances are called:',
+      options: ['Heterotrophs', 'Autotrophs', 'Saprophytes', 'Parasites'],
+      answer: 1,
+      explanation: 'Autotrophs, such as green plants, synthesise their own food using simple inorganic materials.',
+    },
+    {
+      id: 'bio-4',
+      instruction: 'Ecology',
+      prompt: 'The flow of energy through a food chain is best described as:',
+      options: ['Cyclical', 'Unidirectional', 'Reversible', 'Random'],
+      answer: 1,
+      explanation: 'Energy flows in one direction only, from producers to consumers, and is progressively lost as heat.',
+    },
+    {
+      id: 'bio-5',
+      instruction: 'Reproduction',
+      prompt: 'The fusion of a male and a female gamete to form a zygote is called:',
+      options: ['Pollination', 'Fertilisation', 'Germination', 'Ovulation'],
+      answer: 1,
+      explanation: 'Fertilisation is the union of a sperm and an egg (or pollen and ovule) to form a zygote.',
+    },
+    {
+      id: 'bio-6',
+      instruction: 'Nutrition',
+      prompt: 'Which deficiency disease results primarily from a lack of protein in the diet?',
+      options: ['Rickets', 'Kwashiorkor', 'Scurvy', 'Goitre'],
+      answer: 1,
+      explanation: 'Kwashiorkor is a protein-deficiency disease commonly seen in young children.',
+    },
+    {
+      id: 'bio-7',
+      instruction: 'Evolution',
+      prompt: 'Charles Darwin\'s theory of evolution is chiefly based on the principle of:',
+      options: ['Use and disuse', 'Natural selection', 'Special creation', 'Spontaneous generation'],
+      answer: 1,
+      explanation: 'Darwin proposed natural selection — the survival and reproduction of the best-adapted organisms — as the driver of evolution.',
+    },
+    {
+      id: 'bio-8',
+      instruction: 'Support and movement',
+      prompt: 'The functional unit of a skeletal muscle that contracts is called the:',
+      options: ['Neuron', 'Sarcomere', 'Nephron', 'Alveolus'],
+      answer: 1,
+      explanation: 'The sarcomere is the basic contractile unit within a skeletal muscle fibre.',
+    },
+  ],
+
+  history: [
+    {
+      id: 'hist-1',
+      instruction: 'Pre-colonial societies',
+      prompt: 'Before colonial rule, the Igbo political system was mainly organised around:',
+      options: ['A central monarchy', 'Village democracy / councils of elders', 'A single emperor', 'Colonial governors'],
+      answer: 1,
+      explanation: 'Traditional Igbo society was largely stateless, governed through village assemblies and councils of elders rather than a central monarch.',
+    },
+    {
+      id: 'hist-2',
+      instruction: 'Trade',
+      prompt: 'The trans-Saharan trade route mainly linked West Africa with:',
+      options: ['Europe', 'North Africa and the Mediterranean', 'East Asia', 'The Americas'],
+      answer: 1,
+      explanation: 'The trans-Saharan trade routes connected West African kingdoms with North Africa and the wider Mediterranean world.',
+    },
+    {
+      id: 'hist-3',
+      instruction: 'Colonialism',
+      prompt: 'The 1884-85 conference that formalised the European partition of Africa was held in:',
+      options: ['Paris', 'London', 'Berlin', 'Lisbon'],
+      answer: 2,
+      explanation: 'The Berlin Conference of 1884-85 set the rules for European colonial claims over Africa.',
+    },
+    {
+      id: 'hist-4',
+      instruction: 'Colonial administration',
+      prompt: 'Frederick Lugard is chiefly remembered in Nigerian history for introducing:',
+      options: ['Direct rule', 'Indirect rule', 'Universal suffrage', 'The regional system'],
+      answer: 1,
+      explanation: 'Lugard introduced indirect rule, governing through existing traditional rulers under colonial supervision.',
+    },
+    {
+      id: 'hist-5',
+      instruction: 'Nationalism',
+      prompt: 'The National Council of Nigeria and the Cameroons (NCNC) was founded in which year?',
+      options: ['1944', '1951', '1960', '1963'],
+      answer: 0,
+      explanation: 'The NCNC was founded in 1944 as one of the earliest nationalist political organisations in Nigeria.',
+    },
+    {
+      id: 'hist-6',
+      instruction: 'Independence',
+      prompt: 'Nigeria gained independence from British colonial rule in which year?',
+      options: ['1957', '1960', '1963', '1966'],
+      answer: 1,
+      explanation: 'Nigeria became an independent nation on 1 October 1960.',
+    },
+    {
+      id: 'hist-7',
+      instruction: 'Post-independence',
+      prompt: 'Nigeria became a republic, replacing the British monarch as head of state, in:',
+      options: ['1960', '1963', '1966', '1970'],
+      answer: 1,
+      explanation: 'Nigeria became a republic in 1963, with an indigenous President replacing the British monarch as head of state.',
+    },
+    {
+      id: 'hist-8',
+      instruction: 'Civil War',
+      prompt: 'The Nigerian Civil War, fought against the secessionist Republic of Biafra, ended in:',
+      options: ['1967', '1970', '1975', '1979'],
+      answer: 1,
+      explanation: 'The Nigerian Civil War lasted from 1967 to 1970, ending with the surrender of Biafra.',
+    },
+  ],
+
+  literature: [
+    {
+      id: 'lit-1',
+      instruction: 'Figures of speech',
+      prompt: 'Identify the figure of speech in: "The wind whispered through the trees."',
+      options: ['Simile', 'Personification', 'Metaphor', 'Hyperbole'],
+      answer: 1,
+      explanation: 'Giving the wind the human ability to "whisper" is personification — attributing human qualities to a non-human thing.',
+    },
+    {
+      id: 'lit-2',
+      instruction: 'Poetry',
+      prompt: 'A poem of fourteen lines, often exploring a single theme with a structured rhyme scheme, is called a:',
+      options: ['Ballad', 'Sonnet', 'Elegy', 'Ode'],
+      answer: 1,
+      explanation: 'A sonnet is a fourteen-line poem, traditionally written in a fixed rhyme scheme.',
+    },
+    {
+      id: 'lit-3',
+      instruction: 'Figures of speech',
+      prompt: 'What term describes the repetition of consonant sounds at the beginning of neighbouring words, as in "wild and windy"?',
+      options: ['Assonance', 'Alliteration', 'Onomatopoeia', 'Repetition'],
+      answer: 1,
+      explanation: '"Wild" and "windy" both begin with the "w" sound — this repeated initial consonant sound is alliteration.',
+    },
+    {
+      id: 'lit-4',
+      instruction: 'Prose forms',
+      prompt: 'A short story that teaches a moral lesson and often features animal characters is called a:',
+      options: ['Fable', 'Myth', 'Legend', 'Epic'],
+      answer: 0,
+      explanation: 'A fable is a brief tale, often with animal characters, designed to convey a moral lesson.',
+    },
+    {
+      id: 'lit-5',
+      instruction: 'Drama',
+      prompt: 'A speech in which a character alone on stage reveals their private thoughts to the audience is called a:',
+      options: ['Monologue', 'Soliloquy', 'Dialogue', 'Aside'],
+      answer: 1,
+      explanation: 'A soliloquy is delivered by a character alone on stage, revealing inner thoughts directly to the audience.',
+    },
+    {
+      id: 'lit-6',
+      instruction: 'Elements of a story',
+      prompt: 'The term for the time and place in which the events of a story occur is:',
+      options: ['Plot', 'Setting', 'Theme', 'Tone'],
+      answer: 1,
+      explanation: 'Setting refers to the time and location in which a narrative takes place.',
+    },
+    {
+      id: 'lit-7',
+      instruction: 'Figures of speech',
+      prompt: 'Which figure of speech compares two unlike things using "like" or "as"?',
+      options: ['Metaphor', 'Simile', 'Irony', 'Symbolism'],
+      answer: 1,
+      explanation: 'A simile makes an explicit comparison using "like" or "as", e.g. "as brave as a lion".',
+    },
+    {
+      id: 'lit-8',
+      instruction: 'Literary terms',
+      prompt: 'The central message or insight about life conveyed by a literary work is called its:',
+      options: ['Theme', 'Motif', 'Climax', 'Exposition'],
+      answer: 0,
+      explanation: 'The theme is the underlying message or central idea a literary work communicates.',
+    },
+  ],
+
+  government: [
+    {
+      id: 'gov-1',
+      instruction: 'Systems of government',
+      prompt: 'A system of government in which absolute power is concentrated in a single ruler is called:',
+      options: ['Democracy', 'Autocracy', 'Theocracy', 'Oligarchy'],
+      answer: 1,
+      explanation: 'Autocracy is a system of government where one person holds absolute, unchecked power.',
+    },
+    {
+      id: 'gov-2',
+      instruction: 'Concepts of government',
+      prompt: 'The doctrine that government powers should be divided among the executive, legislature and judiciary is known as:',
+      options: ['Rule of law', 'Separation of powers', 'Federalism', 'Fundamental human rights'],
+      answer: 1,
+      explanation: 'Separation of powers divides governmental authority among three distinct arms to prevent abuse of power.',
+    },
+    {
+      id: 'gov-3',
+      instruction: 'Organs of government',
+      prompt: 'How many arms of government are generally recognised under the doctrine of separation of powers?',
+      options: ['Two', 'Three', 'Four', 'Five'],
+      answer: 1,
+      explanation: 'The three arms are the executive, the legislature, and the judiciary.',
+    },
+    {
+      id: 'gov-4',
+      instruction: 'Nigerian constitution',
+      prompt: 'The 1999 Constitution establishes Nigeria as which type of state?',
+      options: ['A unitary state', 'A federal state', 'A confederal state', 'A theocratic state'],
+      answer: 1,
+      explanation: 'Nigeria operates a federal system, sharing powers between a central government and constituent states.',
+    },
+    {
+      id: 'gov-5',
+      instruction: 'Legislature',
+      prompt: 'A legislature made up of two chambers, such as a senate and a house of representatives, is described as:',
+      options: ['Unicameral', 'Bicameral', 'Tricameral', 'Multicameral'],
+      answer: 1,
+      explanation: '"Bicameral" describes a legislature with two chambers or houses.',
+    },
+    {
+      id: 'gov-6',
+      instruction: 'Political concepts',
+      prompt: 'The right of every adult citizen, regardless of status, to vote in elections is called:',
+      options: ['Universal adult suffrage', 'Proportional representation', 'Electoral college', 'Franchise restriction'],
+      answer: 0,
+      explanation: 'Universal adult suffrage grants every qualified adult citizen the right to vote.',
+    },
+    {
+      id: 'gov-7',
+      instruction: 'Systems of government',
+      prompt: 'In a presidential system of government, who typically serves as the head of the executive arm?',
+      options: ['The Prime Minister', 'The President', 'The Speaker', 'The Chief Justice'],
+      answer: 1,
+      explanation: 'Under a presidential system, the President is both head of state and head of the executive branch.',
+    },
+    {
+      id: 'gov-8',
+      instruction: 'Party systems',
+      prompt: 'A political system dominated by only two major parties is referred to as a:',
+      options: ['One-party system', 'Two-party system', 'Multi-party system', 'No-party system'],
+      answer: 1,
+      explanation: 'A two-party system is one in which two major parties dominate the political landscape.',
+    },
+  ],
+
+  crs: [
+    {
+      id: 'crs-1',
+      instruction: 'Old Testament',
+      prompt: 'Who led the Israelites out of slavery in Egypt?',
+      options: ['Abraham', 'Moses', 'Joshua', 'David'],
+      answer: 1,
+      explanation: 'Moses led the Israelites out of Egypt, as recorded in the Book of Exodus.',
+    },
+    {
+      id: 'crs-2',
+      instruction: 'Old Testament',
+      prompt: 'The account of the creation of the world is recorded in which book of the Bible?',
+      options: ['Exodus', 'Genesis', 'Leviticus', 'Numbers'],
+      answer: 1,
+      explanation: 'Genesis, the first book of the Bible, records the creation account.',
+    },
+    {
+      id: 'crs-3',
+      instruction: 'Old Testament',
+      prompt: 'Where did Moses receive the Ten Commandments?',
+      options: ['Mount Sinai', 'Mount Carmel', 'Mount Ararat', 'Mount Zion'],
+      answer: 0,
+      explanation: 'Moses received the Ten Commandments from God on Mount Sinai.',
+    },
+    {
+      id: 'crs-4',
+      instruction: 'New Testament',
+      prompt: 'Which disciple betrayed Jesus to the religious authorities?',
+      options: ['Peter', 'John', 'Judas Iscariot', 'Thomas'],
+      answer: 2,
+      explanation: 'Judas Iscariot betrayed Jesus for thirty pieces of silver.',
+    },
+    {
+      id: 'crs-5',
+      instruction: 'New Testament',
+      prompt: 'The Beatitudes, which begin "Blessed are...", form part of which teaching of Jesus?',
+      options: ['The Parable of the Sower', 'The Sermon on the Mount', 'The Last Supper discourse', 'The Great Commission'],
+      answer: 1,
+      explanation: 'The Beatitudes open the Sermon on the Mount, recorded in Matthew chapters 5–7.',
+    },
+    {
+      id: 'crs-6',
+      instruction: 'Old Testament',
+      prompt: 'According to Genesis, who was the first man created by God?',
+      options: ['Noah', 'Cain', 'Adam', 'Seth'],
+      answer: 2,
+      explanation: 'Genesis records Adam as the first man created by God.',
+    },
+    {
+      id: 'crs-7',
+      instruction: 'New Testament',
+      prompt: 'The Parable of the Good Samaritan primarily teaches the lesson of:',
+      options: ['Patience in suffering', 'Loving one\'s neighbour regardless of background', 'The dangers of wealth', 'Forgiveness of sins'],
+      answer: 1,
+      explanation: 'The parable teaches that true neighbourliness means showing compassion to anyone in need, regardless of background.',
+    },
+    {
+      id: 'crs-8',
+      instruction: 'New Testament',
+      prompt: 'How many apostles did Jesus choose as his closest disciples?',
+      options: ['Seven', 'Ten', 'Twelve', 'Fourteen'],
+      answer: 2,
+      explanation: 'Jesus chose twelve apostles to be his closest followers.',
+    },
+  ],
+
+  economics: [
+    {
+      id: 'eco-1',
+      instruction: 'Basic concepts',
+      prompt: 'The economic problem that arises because human wants are unlimited but resources are limited is called:',
+      options: ['Inflation', 'Scarcity', 'Monopoly', 'Recession'],
+      answer: 1,
+      explanation: 'Scarcity describes the fundamental economic problem of limited resources relative to unlimited wants.',
+    },
+    {
+      id: 'eco-2',
+      instruction: 'Demand and supply',
+      prompt: 'According to the law of demand, when the price of a good rises, all else being equal, quantity demanded will:',
+      options: ['Increase', 'Decrease', 'Remain constant', 'Rise then fall'],
+      answer: 1,
+      explanation: 'The law of demand states that price and quantity demanded are inversely related, so a price rise reduces quantity demanded.',
+    },
+    {
+      id: 'eco-3',
+      instruction: 'Basic concepts',
+      prompt: 'The value of the next best alternative given up when a choice is made is known as:',
+      options: ['Marginal cost', 'Opportunity cost', 'Sunk cost', 'Fixed cost'],
+      answer: 1,
+      explanation: 'Opportunity cost is the value of the best forgone alternative when a decision is made.',
+    },
+    {
+      id: 'eco-4',
+      instruction: 'Unemployment',
+      prompt: 'Unemployment that occurs due to normal turnover, such as workers between jobs, is called:',
+      options: ['Structural unemployment', 'Cyclical unemployment', 'Frictional unemployment', 'Seasonal unemployment'],
+      answer: 2,
+      explanation: 'Frictional unemployment refers to short-term unemployment as people transition between jobs.',
+    },
+    {
+      id: 'eco-5',
+      instruction: 'Inflation',
+      prompt: 'A persistent rise in the general price level of goods and services in an economy is called:',
+      options: ['Deflation', 'Inflation', 'Stagnation', 'Devaluation'],
+      answer: 1,
+      explanation: 'Inflation refers to a sustained increase in the general price level over time.',
+    },
+    {
+      id: 'eco-6',
+      instruction: 'Factors of production',
+      prompt: 'Which of the following is NOT one of the four traditional factors of production?',
+      options: ['Land', 'Labour', 'Capital', 'Inflation'],
+      answer: 3,
+      explanation: 'The four factors of production are land, labour, capital, and entrepreneurship. Inflation is not a factor of production.',
+    },
+    {
+      id: 'eco-7',
+      instruction: 'National income',
+      prompt: 'The total monetary value of all finished goods and services produced within a country in a given period is called:',
+      options: ['GNP', 'GDP', 'Net income', 'Per capita income'],
+      answer: 1,
+      explanation: 'Gross Domestic Product (GDP) measures the total value of goods and services produced within a country\'s borders.',
+    },
+    {
+      id: 'eco-8',
+      instruction: 'Demand and supply',
+      prompt: 'The point at which the quantity demanded of a good equals the quantity supplied is called:',
+      options: ['Market failure', 'Equilibrium', 'Surplus', 'Elasticity'],
+      answer: 1,
+      explanation: 'Market equilibrium occurs where the demand and supply curves intersect, so quantity demanded equals quantity supplied.',
+    },
+  ],
+
+  commerce: [
+    {
+      id: 'com-1',
+      instruction: 'Basic concepts',
+      prompt: 'The sum total of activities involved in the buying and selling of goods, including aids to trade, is called:',
+      options: ['Trade', 'Commerce', 'Industry', 'Production'],
+      answer: 1,
+      explanation: 'Commerce encompasses trade plus all the activities (such as transport, banking, and insurance) that assist trade.',
+    },
+    {
+      id: 'com-2',
+      instruction: 'Classification of trade',
+      prompt: 'Trade carried out between buyers and sellers within the same country is called:',
+      options: ['Home trade', 'Foreign trade', 'Entrepot trade', 'Bilateral trade'],
+      answer: 0,
+      explanation: 'Home trade (or internal trade) refers to buying and selling of goods within a single country.',
+    },
+    {
+      id: 'com-3',
+      instruction: 'Aids to trade',
+      prompt: 'A contract in which one party agrees to compensate another for a specified loss in exchange for a premium is called:',
+      options: ['A mortgage', 'Insurance', 'A hire-purchase agreement', 'A bill of exchange'],
+      answer: 1,
+      explanation: 'Insurance is a contract where an insurer compensates the insured for specified losses in return for premium payments.',
+    },
+    {
+      id: 'com-4',
+      instruction: 'Documents in trade',
+      prompt: 'A document issued by a shipping company as evidence of a contract of carriage and receipt of goods is called a:',
+      options: ['Invoice', 'Bill of lading', 'Cheque', 'Receipt'],
+      answer: 1,
+      explanation: 'A bill of lading serves as a receipt for goods shipped and evidence of the contract of carriage.',
+    },
+    {
+      id: 'com-5',
+      instruction: 'Channels of distribution',
+      prompt: 'A trader who buys goods in bulk from producers and sells in smaller quantities to retailers is called a:',
+      options: ['Retailer', 'Wholesaler', 'Consumer', 'Broker'],
+      answer: 1,
+      explanation: 'A wholesaler buys in bulk from producers and breaks the goods into smaller lots for retailers.',
+    },
+    {
+      id: 'com-6',
+      instruction: 'Banking',
+      prompt: 'A written order instructing a bank to pay a specified sum from one\'s account is called a:',
+      options: ['Cheque', 'Promissory note', 'Bill of lading', 'Invoice'],
+      answer: 0,
+      explanation: 'A cheque is a written instruction to a bank to pay a stated amount from the account holder\'s funds.',
+    },
+    {
+      id: 'com-7',
+      instruction: 'Aids to trade',
+      prompt: 'The storage of goods until they are needed for sale or use is known as:',
+      options: ['Warehousing', 'Advertising', 'Branding', 'Packaging'],
+      answer: 0,
+      explanation: 'Warehousing involves the storage of goods, bridging the time gap between production and consumption.',
+    },
+    {
+      id: 'com-8',
+      instruction: 'Business organisation',
+      prompt: 'A market where shares and stocks of public companies are bought and sold is called a:',
+      options: ['Money market', 'Stock exchange', 'Commodity market', 'Foreign exchange market'],
+      answer: 1,
+      explanation: 'A stock exchange is an organised market for buying and selling shares and stocks of public companies.',
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard / progress display data — swap for real analytics once a
+// results table exists.
+// ---------------------------------------------------------------------------
+
+export const weeklyActivity = [
+  { day: 'Mon', value: 16 },
+  { day: 'Tue', value: 20 },
+  { day: 'Wed', value: 24 },
+  { day: 'Thu', value: 20 },
+  { day: 'Fri', value: 32 },
+  { day: 'Sat', value: 28 },
+  { day: 'Sun', value: 36 },
+]
+
+export const subjectPerformance = [
+  { subject: 'Mathematics', accuracy: 82 },
+  { subject: 'Use of English', accuracy: 76 },
+  { subject: 'Physics', accuracy: 69 },
+  { subject: 'Chemistry', accuracy: 88 },
+]
+
+export const weakTopics = [
+  { topic: 'Number bases', subject: 'mathematics', accuracy: 52, questions: 8 },
+  { topic: 'Current electricity', subject: 'physics', accuracy: 58, questions: 8 },
+  { topic: 'Chemical bonding', subject: 'chemistry', accuracy: 61, questions: 8 },
+]
+
+export const pastPapers = [
+  { id: 'jamb-math-2024', title: 'JAMB Mathematics — 2024', subject: 'mathematics', meta: '8 questions · Number bases, algebra, mensuration' },
+  { id: 'jamb-eng-2023', title: 'JAMB Use of English — 2023', subject: 'english', meta: '8 questions · Vocabulary, grammar, comprehension' },
+  { id: 'jamb-phy-2022', title: 'JAMB Physics — 2022', subject: 'physics', meta: '8 questions · Mechanics, electricity, waves' },
+]
+
+export const mockExams = [
+  { id: 'science-full-mock', streamId: 'science', title: 'Science Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
+  { id: 'arts-full-mock', streamId: 'arts', title: 'Arts Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
+  { id: 'commercial-full-mock', streamId: 'commercial', title: 'Commercial Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
+  { id: 'jamb-math-mock', streamId: 'science', subjectId: 'mathematics', title: 'JAMB Mathematics Timed Mock', duration: 40, questions: 40, difficulty: 'Intermediate' },
+  { id: 'jamb-eng-mock', streamId: 'arts', subjectId: 'english', title: 'JAMB Use of English Timed Mock', duration: 40, questions: 60, difficulty: 'Intermediate' },
+]
