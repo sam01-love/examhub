@@ -8,10 +8,6 @@
 // to map directly onto a table with those columns.
 // ---------------------------------------------------------------------------
 
-// Every stream is compulsory-English plus 3 electives picked from a 4-subject
-// pool (e.g. Science: pick 3 of Mathematics/Biology/Physics/Chemistry). This
-// mirrors how JAMB combinations actually work — some subjects are optional
-// alternatives (Biology vs Mathematics for non-engineering science students).
 export const streams = [
   {
     id: 'science',
@@ -19,10 +15,7 @@ export const streams = [
     tagline: 'Engineering, medicine & pure sciences',
     description: 'For candidates targeting Medicine, Engineering, Computer Science and related courses.',
     icon: 'FlaskConical',
-    compulsory: 'english',
-    electivePool: ['mathematics', 'biology', 'physics', 'chemistry'],
-    electivesRequired: 3,
-    subjectIds: ['english', 'physics', 'chemistry', 'mathematics'],
+    subjectIds: ['english', 'mathematics', 'physics', 'chemistry'],
   },
   {
     id: 'arts',
@@ -30,9 +23,6 @@ export const streams = [
     tagline: 'Humanities, law & mass communication',
     description: 'For candidates targeting Law, Mass Communication, Languages and related courses.',
     icon: 'Landmark',
-    compulsory: 'english',
-    electivePool: ['literature', 'government', 'crs', 'history'],
-    electivesRequired: 3,
     subjectIds: ['english', 'literature', 'government', 'crs'],
   },
   {
@@ -41,9 +31,6 @@ export const streams = [
     tagline: 'Business, accounting & economics',
     description: 'For candidates targeting Accounting, Business Admin, Economics and related courses.',
     icon: 'Briefcase',
-    compulsory: 'english',
-    electivePool: ['mathematics', 'economics', 'commerce', 'government'],
-    electivesRequired: 3,
     subjectIds: ['english', 'mathematics', 'economics', 'commerce'],
   },
 ]
@@ -51,46 +38,16 @@ export const streams = [
 export const subjectMeta = {
   english: { name: 'Use of English', short: 'English', color: 'blue' },
   mathematics: { name: 'Mathematics', short: 'Maths', color: 'indigo' },
-  biology: { name: 'Biology', short: 'Biology', color: 'lime' },
   physics: { name: 'Physics', short: 'Physics', color: 'sky' },
   chemistry: { name: 'Chemistry', short: 'Chemistry', color: 'green' },
   literature: { name: 'Literature-in-English', short: 'Literature', color: 'rose' },
   government: { name: 'Government', short: 'Government', color: 'amber' },
   crs: { name: 'Christian Religious Studies', short: 'CRS', color: 'purple' },
-  history: { name: 'History', short: 'History', color: 'yellow' },
   economics: { name: 'Economics', short: 'Economics', color: 'teal' },
   commerce: { name: 'Commerce', short: 'Commerce', color: 'orange' },
 }
 
 export const targetScores = ['180+', '200+', '250+', '300+', '350+']
-
-// ---------------------------------------------------------------------------
-// Real JAMB question counts: Use of English is 60 questions, every other
-// subject is 40. Scoring is normalised to 100 marks per subject regardless of
-// question count, so 4 subjects sum to a final result out of 400.
-// ---------------------------------------------------------------------------
-export const QUESTION_TARGETS = { english: 60 }
-export const DEFAULT_QUESTION_TARGET = 40
-export const MARKS_PER_SUBJECT = 100
-export const EXAM_DURATION_MINUTES = 120
-
-export function getQuestionTarget(subjectId) {
-  return QUESTION_TARGETS[subjectId] ?? DEFAULT_QUESTION_TARGET
-}
-
-// Cycles through the (small) mock question bank to fill the real subject
-// question count, tagging each question with its subject and a unique id.
-export function buildQuestionSet(subjectId, count) {
-  const bank = questionBank[subjectId] || []
-  if (!bank.length) return []
-  const target = count ?? getQuestionTarget(subjectId)
-  const set = []
-  for (let i = 0; i < target; i++) {
-    const base = bank[i % bank.length]
-    set.push({ ...base, subjectId, uid: `${subjectId}-${i}` })
-  }
-  return set
-}
 
 // A small, original bank of JAMB-standard practice questions for every
 // subject across the three streams. Each subject currently ships with 8
@@ -371,140 +328,6 @@ export const questionBank = {
       options: ['It doubles', 'It halves', 'It stays the same', 'It quadruples'],
       answer: 1,
       explanation: "By Boyle's law, at constant temperature, pressure and volume are inversely proportional, so doubling pressure halves the volume.",
-    },
-  ],
-
-  biology: [
-    {
-      id: 'bio-1',
-      instruction: 'Cell biology',
-      prompt: 'Which organelle is responsible for aerobic respiration in a cell?',
-      options: ['Nucleus', 'Mitochondrion', 'Ribosome', 'Golgi apparatus'],
-      answer: 1,
-      explanation: 'The mitochondrion is the site of aerobic respiration, producing ATP for the cell.',
-    },
-    {
-      id: 'bio-2',
-      instruction: 'Genetics',
-      prompt: 'In humans, a child with blood group O has parents with blood groups A and B. What does this show about the O allele?',
-      options: ['It is dominant', 'It is recessive', 'It is co-dominant', 'It is sex-linked'],
-      answer: 1,
-      explanation: 'The O allele only shows up when no dominant A or B allele is present, so it is recessive.',
-    },
-    {
-      id: 'bio-3',
-      instruction: 'Classification',
-      prompt: 'Organisms that can manufacture their own food from simple inorganic substances are called:',
-      options: ['Heterotrophs', 'Autotrophs', 'Saprophytes', 'Parasites'],
-      answer: 1,
-      explanation: 'Autotrophs, such as green plants, synthesise their own food using simple inorganic materials.',
-    },
-    {
-      id: 'bio-4',
-      instruction: 'Ecology',
-      prompt: 'The flow of energy through a food chain is best described as:',
-      options: ['Cyclical', 'Unidirectional', 'Reversible', 'Random'],
-      answer: 1,
-      explanation: 'Energy flows in one direction only, from producers to consumers, and is progressively lost as heat.',
-    },
-    {
-      id: 'bio-5',
-      instruction: 'Reproduction',
-      prompt: 'The fusion of a male and a female gamete to form a zygote is called:',
-      options: ['Pollination', 'Fertilisation', 'Germination', 'Ovulation'],
-      answer: 1,
-      explanation: 'Fertilisation is the union of a sperm and an egg (or pollen and ovule) to form a zygote.',
-    },
-    {
-      id: 'bio-6',
-      instruction: 'Nutrition',
-      prompt: 'Which deficiency disease results primarily from a lack of protein in the diet?',
-      options: ['Rickets', 'Kwashiorkor', 'Scurvy', 'Goitre'],
-      answer: 1,
-      explanation: 'Kwashiorkor is a protein-deficiency disease commonly seen in young children.',
-    },
-    {
-      id: 'bio-7',
-      instruction: 'Evolution',
-      prompt: 'Charles Darwin\'s theory of evolution is chiefly based on the principle of:',
-      options: ['Use and disuse', 'Natural selection', 'Special creation', 'Spontaneous generation'],
-      answer: 1,
-      explanation: 'Darwin proposed natural selection — the survival and reproduction of the best-adapted organisms — as the driver of evolution.',
-    },
-    {
-      id: 'bio-8',
-      instruction: 'Support and movement',
-      prompt: 'The functional unit of a skeletal muscle that contracts is called the:',
-      options: ['Neuron', 'Sarcomere', 'Nephron', 'Alveolus'],
-      answer: 1,
-      explanation: 'The sarcomere is the basic contractile unit within a skeletal muscle fibre.',
-    },
-  ],
-
-  history: [
-    {
-      id: 'hist-1',
-      instruction: 'Pre-colonial societies',
-      prompt: 'Before colonial rule, the Igbo political system was mainly organised around:',
-      options: ['A central monarchy', 'Village democracy / councils of elders', 'A single emperor', 'Colonial governors'],
-      answer: 1,
-      explanation: 'Traditional Igbo society was largely stateless, governed through village assemblies and councils of elders rather than a central monarch.',
-    },
-    {
-      id: 'hist-2',
-      instruction: 'Trade',
-      prompt: 'The trans-Saharan trade route mainly linked West Africa with:',
-      options: ['Europe', 'North Africa and the Mediterranean', 'East Asia', 'The Americas'],
-      answer: 1,
-      explanation: 'The trans-Saharan trade routes connected West African kingdoms with North Africa and the wider Mediterranean world.',
-    },
-    {
-      id: 'hist-3',
-      instruction: 'Colonialism',
-      prompt: 'The 1884-85 conference that formalised the European partition of Africa was held in:',
-      options: ['Paris', 'London', 'Berlin', 'Lisbon'],
-      answer: 2,
-      explanation: 'The Berlin Conference of 1884-85 set the rules for European colonial claims over Africa.',
-    },
-    {
-      id: 'hist-4',
-      instruction: 'Colonial administration',
-      prompt: 'Frederick Lugard is chiefly remembered in Nigerian history for introducing:',
-      options: ['Direct rule', 'Indirect rule', 'Universal suffrage', 'The regional system'],
-      answer: 1,
-      explanation: 'Lugard introduced indirect rule, governing through existing traditional rulers under colonial supervision.',
-    },
-    {
-      id: 'hist-5',
-      instruction: 'Nationalism',
-      prompt: 'The National Council of Nigeria and the Cameroons (NCNC) was founded in which year?',
-      options: ['1944', '1951', '1960', '1963'],
-      answer: 0,
-      explanation: 'The NCNC was founded in 1944 as one of the earliest nationalist political organisations in Nigeria.',
-    },
-    {
-      id: 'hist-6',
-      instruction: 'Independence',
-      prompt: 'Nigeria gained independence from British colonial rule in which year?',
-      options: ['1957', '1960', '1963', '1966'],
-      answer: 1,
-      explanation: 'Nigeria became an independent nation on 1 October 1960.',
-    },
-    {
-      id: 'hist-7',
-      instruction: 'Post-independence',
-      prompt: 'Nigeria became a republic, replacing the British monarch as head of state, in:',
-      options: ['1960', '1963', '1966', '1970'],
-      answer: 1,
-      explanation: 'Nigeria became a republic in 1963, with an indigenous President replacing the British monarch as head of state.',
-    },
-    {
-      id: 'hist-8',
-      instruction: 'Civil War',
-      prompt: 'The Nigerian Civil War, fought against the secessionist Republic of Biafra, ended in:',
-      options: ['1967', '1970', '1975', '1979'],
-      answer: 1,
-      explanation: 'The Nigerian Civil War lasted from 1967 to 1970, ending with the surrender of Biafra.',
     },
   ],
 
@@ -879,9 +702,9 @@ export const pastPapers = [
 ]
 
 export const mockExams = [
-  { id: 'science-full-mock', streamId: 'science', title: 'Science Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
-  { id: 'arts-full-mock', streamId: 'arts', title: 'Arts Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
-  { id: 'commercial-full-mock', streamId: 'commercial', title: 'Commercial Full Mock — 4 Subjects', duration: 120, questions: 180, difficulty: 'Exam standard' },
-  { id: 'jamb-math-mock', streamId: 'science', subjectId: 'mathematics', title: 'JAMB Mathematics Timed Mock', duration: 40, questions: 40, difficulty: 'Intermediate' },
-  { id: 'jamb-eng-mock', streamId: 'arts', subjectId: 'english', title: 'JAMB Use of English Timed Mock', duration: 40, questions: 60, difficulty: 'Intermediate' },
+  { id: 'science-full-mock', streamId: 'science', title: 'Science Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
+  { id: 'arts-full-mock', streamId: 'arts', title: 'Arts Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
+  { id: 'commercial-full-mock', streamId: 'commercial', title: 'Commercial Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
+  { id: 'jamb-math-mock', streamId: 'science', subjectId: 'mathematics', title: 'JAMB Mathematics Timed Mock', duration: 40, questions: 8, difficulty: 'Intermediate' },
+  { id: 'jamb-eng-mock', streamId: 'arts', subjectId: 'english', title: 'JAMB Use of English Timed Mock', duration: 40, questions: 8, difficulty: 'Intermediate' },
 ]
