@@ -12,7 +12,7 @@ function Root() {
     <>
       {!ready && <Preloader onFinish={() => setReady(true)} />}
       {ready && (
-        <BrowserRouter>
+        <BrowserRouter basename="/examhub">
           <App />
         </BrowserRouter>
       )}
