@@ -1,6 +1,6 @@
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import Preloader from './components/Preloader.jsx'
@@ -12,9 +12,9 @@ function Root() {
     <>
       {!ready && <Preloader onFinish={() => setReady(true)} />}
       {ready && (
-        <BrowserRouter basename="/examhub">
+        <HashRouter>
           <App />
-        </BrowserRouter>
+        </HashRouter>
       )}
     </>
   )
