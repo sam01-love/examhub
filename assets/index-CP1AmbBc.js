@@ -24,4 +24,4 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           50% { transform: translateX(60%); }
           100% { transform: translateX(220%); }
         }
-      `})]})}function Ud(){let[e,t]=(0,x.useState)(!1);return(0,V.jsxs)(V.Fragment,{children:[!e&&(0,V.jsx)(Hd,{onFinish:()=>t(!0)}),e&&(0,V.jsx)(In,{children:(0,V.jsx)(Vd,{})})]})}(0,Jn.createRoot)(document.getElementById(`root`)).render((0,V.jsx)(x.StrictMode,{children:(0,V.jsx)(Ud,{})}));
+      `})]})}function Ud(){let[e,t]=(0,x.useState)(!1);return(0,V.jsxs)(V.Fragment,{children:[!e&&(0,V.jsx)(Hd,{onFinish:()=>t(!0)}),e&&(0,V.jsx)(In,{basename:`/examhub`,children:(0,V.jsx)(Vd,{})})]})}(0,Jn.createRoot)(document.getElementById(`root`)).render((0,V.jsx)(x.StrictMode,{children:(0,V.jsx)(Ud,{})}));
