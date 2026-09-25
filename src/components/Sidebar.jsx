@@ -3,7 +3,6 @@ import {
   LayoutDashboard,
   CirclePlay,
   ClipboardCheck,
-  Folder,
   ChartBar,
   Target,
   Settings,
@@ -21,7 +20,6 @@ const navGroups = [
     items: [
       { to: '/practice', label: 'Practice Questions', icon: CirclePlay },
       { to: '/mock-exams', label: 'Mock Exams', icon: ClipboardCheck },
-      { to: '/practice#past-papers', label: 'Past Questions', icon: Folder },
     ],
   },
   {

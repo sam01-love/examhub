@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FlaskConical, Landmark, Briefcase, Search, ChevronDown, Zap, ArrowRight, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import Logo from '../components/Logo'
-import { streams, subjectMeta, targetScores } from '../data/mockData'
+import { streams, subjectMeta, targetScores, streamSubjectIds } from '../data/mockData'
 
 const streamIcons = { FlaskConical, Landmark, Briefcase }
 
@@ -23,7 +23,7 @@ export default function Onboarding() {
     await saveStudyPlan({
       examType: 'jamb',
       stream: streamId,
-      subjects: activeStream.subjectIds,
+      subjects: streamSubjectIds(activeStream),
       targetScore,
       institution,
     })
@@ -90,12 +90,13 @@ export default function Onboarding() {
             </section>
 
             <section>
-              <h2 className="font-heading text-lg font-semibold">Your subject combination</h2>
+              <h2 className="font-heading text-lg font-semibold">Compulsory subjects</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Every JAMB candidate sits these four subjects for the {activeStream.name.toLowerCase()} stream.
+                You'll pick your remaining {activeStream.electiveCount} elective subject
+                {activeStream.electiveCount > 1 ? 's' : ''} from the {activeStream.name.toLowerCase()} pool when you start Exam Mode.
               </p>
               <div className="mt-4 flex flex-wrap gap-3">
-                {activeStream.subjectIds.map((id) => (
+                {activeStream.compulsory.map((id) => (
                   <span
                     key={id}
                     className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
@@ -153,7 +154,7 @@ export default function Onboarding() {
                 <div>
                   <h2 className="font-heading text-lg font-semibold">You are ready to start preparing!</h2>
                   <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    We will begin with JAMB {subjectMeta[activeStream.subjectIds[0]].name} and suggest
+                    We will begin with JAMB {subjectMeta[activeStream.compulsory[0]].name} and suggest
                     focused topics across your {activeStream.name.toLowerCase()} subjects based on your target score.
                   </p>
                 </div>

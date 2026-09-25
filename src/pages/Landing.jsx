@@ -283,7 +283,7 @@ export default function Landing() {
                   <Icon size={26} className={featured ? '' : 'text-primary'} />
                   <h3 className="mt-8 font-heading text-xl font-bold">{stream.name}</h3>
                   <p className={`mt-2 text-sm ${featured ? '' : 'text-muted-foreground'}`}>
-                    {stream.description}
+                    {stream.tagline}
                   </p>
                 </div>
               )

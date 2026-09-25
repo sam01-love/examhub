@@ -1,204 +1,232 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   FlaskConical,
   Landmark,
   Briefcase,
   ArrowRight,
   ArrowLeft,
-  Search,
-  CheckCircle2,
-  ListChecks,
+  BookOpen,
+  Timer,
+  Lock,
+  Check,
 } from 'lucide-react'
-import { streams, subjectMeta, questionBank, pastPapers } from '../data/mockData'
+import { streams, subjectMeta, streamSubjectIds, subjectQuestionCount } from '../data/mockData'
 
 const streamIcons = { FlaskConical, Landmark, Briefcase }
 
 export default function PracticeSetup() {
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const streamParam = params.get('stream')
-  const [query, setQuery] = useState('')
+  const mode = params.get('mode')
+  const streamId = params.get('stream')
+  const [electives, setElectives] = useState([])
 
-  const activeStream = useMemo(
-    () => streams.find((s) => s.id === streamParam) || null,
-    [streamParam]
-  )
+  const activeStream = useMemo(() => streams.find((s) => s.id === streamId) || null, [streamId])
 
-  const selectStream = (id) => setParams({ stream: id })
-  const clearStream = () => setParams({})
+  const setMode = (m) => setParams({ mode: m })
+  const selectStream = (id) => {
+    setElectives([])
+    setParams({ mode, stream: id })
+  }
+  const goBack = () => {
+    if (streamId) return setParams({ mode })
+    setParams({})
+  }
 
-  const filteredPapers = pastPapers.filter((p) =>
-    p.title.toLowerCase().includes(query.toLowerCase())
-  )
+  const toggleElective = (id) => {
+    if (!activeStream) return
+    setElectives((prev) => {
+      if (prev.includes(id)) return prev.filter((e) => e !== id)
+      if (prev.length >= activeStream.electiveCount) return prev
+      return [...prev, id]
+    })
+  }
+
+  const startExam = () => {
+    const subjects = [...activeStream.compulsory, ...electives]
+    navigate(`/practice/session?mode=exam&stream=${activeStream.id}&subjects=${subjects.join(',')}`)
+  }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8">
-      {/* ===== Header ===== */}
-      <section className="max-w-2xl">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary">
-          <span className="h-2 w-2 rounded-full bg-tertiary" />
-          Practice centre
+    <div className="mx-auto w-full max-w-5xl space-y-8">
+      <header className="flex items-center gap-3">
+        {(mode) && (
+          <button
+            onClick={goBack}
+            aria-label="Go back"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:border-primary hover:text-primary"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Practice centre</p>
+          <h1 className="font-heading text-xl font-bold sm:text-2xl">Practice questions</h1>
         </div>
-        <h1 className="text-balance font-heading text-2xl font-bold tracking-tight sm:text-3xl">
-          Practice questions, built to JAMB standard.
-        </h1>
-        <p className="mt-3 text-pretty text-sm leading-7 text-muted-foreground sm:text-base">
-          Choose your JAMB stream, then practice original questions across its four standard
-          subjects — Use of English plus three subject-specific papers.
-        </p>
-      </section>
+      </header>
 
-      {!activeStream ? (
-        <StreamPicker onSelect={selectStream} />
-      ) : (
-        <SubjectPicker stream={activeStream} onBack={clearStream} />
+      {!mode && <ModePicker onSelect={setMode} />}
+      {mode && !streamId && <StreamPicker onSelect={selectStream} />}
+      {mode === 'study' && activeStream && <StudySubjectPicker stream={activeStream} />}
+      {mode === 'exam' && activeStream && (
+        <ExamCombinationPicker
+          stream={activeStream}
+          electives={electives}
+          onToggle={toggleElective}
+          onStart={startExam}
+        />
       )}
-
-      {/* ===== Past question collections ===== */}
-      <section id="past-papers" className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-heading text-lg font-semibold">Past question collections</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Practice with dated, exam-style question sets.</p>
-          </div>
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="min-h-11 w-full rounded-lg border border-input bg-background py-3 pl-10 pr-4 text-sm outline-none placeholder:text-muted-foreground sm:w-64"
-              placeholder="Search a past paper"
-            />
-          </div>
-        </div>
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredPapers.map((paper) => (
-            <div key={paper.id} className="rounded-xl bg-muted p-4">
-              <p className="text-sm font-semibold">{paper.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{paper.meta}</p>
-              <Link
-                to={`/practice/session?subject=${paper.subject}`}
-                className="mt-4 inline-flex items-center text-sm font-semibold text-primary"
-              >
-                Practice now <ArrowRight size={16} className="ml-1" />
-              </Link>
-            </div>
-          ))}
-          {filteredPapers.length === 0 && (
-            <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">
-              No past papers match "{query}".
-            </p>
-          )}
-        </div>
-      </section>
     </div>
+  )
+}
+
+function ModePicker({ onSelect }) {
+  return (
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <button
+        onClick={() => onSelect('study')}
+        className="group flex flex-col items-center rounded-2xl border border-border bg-card p-8 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+      >
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-secondary text-primary transition-transform group-hover:scale-105">
+          <BookOpen size={28} />
+        </span>
+        <h2 className="mt-5 font-heading text-lg font-bold">Study Mode</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Untimed · one subject · instant explanations</p>
+      </button>
+
+      <button
+        onClick={() => onSelect('exam')}
+        className="group flex flex-col items-center rounded-2xl border border-border bg-card p-8 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+      >
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tertiary/15 text-tertiary transition-transform group-hover:scale-105">
+          <Timer size={28} />
+        </span>
+        <h2 className="mt-5 font-heading text-lg font-bold">Exam Mode</h2>
+        <p className="mt-1 text-sm text-muted-foreground">2 hours · 4 subjects · scored out of 400</p>
+      </button>
+    </section>
   )
 }
 
 function StreamPicker({ onSelect }) {
   return (
-    <section>
-      <h2 className="font-heading text-lg font-bold">1. Choose your JAMB stream</h2>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {streams.map((stream) => {
-          const Icon = streamIcons[stream.icon]
-          return (
-            <button
-              key={stream.id}
-              onClick={() => onSelect(stream.id)}
-              className="group flex flex-col rounded-2xl border border-border bg-card p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
-            >
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
-                <Icon size={24} />
-              </span>
-              <h3 className="mt-5 font-heading text-lg font-semibold">{stream.name}</h3>
-              <p className="mt-1 text-sm font-medium text-primary">{stream.tagline}</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">{stream.description}</p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {stream.subjectIds.map((id) => (
-                  <span
-                    key={id}
-                    className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground"
-                  >
-                    {subjectMeta[id].short}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-6 flex items-center text-sm font-semibold text-primary">
-                Explore {stream.name}
-                <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-0.5" />
-              </div>
-            </button>
-          )
-        })}
-      </div>
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {streams.map((stream) => {
+        const Icon = streamIcons[stream.icon]
+        return (
+          <button
+            key={stream.id}
+            onClick={() => onSelect(stream.id)}
+            className="group flex flex-col items-center rounded-2xl border border-border bg-card p-6 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
+              <Icon size={22} />
+            </span>
+            <h3 className="mt-4 font-heading text-base font-bold">{stream.name}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{stream.tagline}</p>
+          </button>
+        )
+      })}
     </section>
   )
 }
 
-function SubjectPicker({ stream, onBack }) {
+function StudySubjectPicker({ stream }) {
+  const subjectIds = streamSubjectIds(stream)
   return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {subjectIds.map((id) => (
+        <Link
+          key={id}
+          to={`/practice/session?mode=study&subject=${id}`}
+          className="group flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
+            <BookOpen size={20} />
+          </span>
+          <p className="mt-3 text-sm font-bold">{subjectMeta[id].short}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{subjectQuestionCount(id)} Qs</p>
+        </Link>
+      ))}
+    </section>
+  )
+}
+
+function ExamCombinationPicker({ stream, electives, onToggle, onStart }) {
+  const ready = electives.length === stream.electiveCount
+  const totalQuestions =
+    stream.compulsory.reduce((sum, id) => sum + subjectQuestionCount(id), 0) +
+    electives.reduce((sum, id) => sum + subjectQuestionCount(id), 0)
+
+  return (
+    <section className="space-y-6">
+      <div>
+        <p className="text-sm font-semibold">Compulsory</p>
+        <div className="mt-3 flex flex-wrap gap-3">
+          {stream.compulsory.map((id) => (
+            <span
+              key={id}
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground"
+            >
+              <Lock size={14} />
+              {subjectMeta[id].short}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold">
+          Choose {stream.electiveCount} of {stream.electivePool.length}
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {stream.electivePool.map((id) => {
+            const active = electives.includes(id)
+            const disabled = !active && electives.length >= stream.electiveCount
+            return (
+              <button
+                key={id}
+                disabled={disabled}
+                onClick={() => onToggle(id)}
+                className={`flex flex-col items-center rounded-2xl border p-5 text-center transition-all ${
+                  active
+                    ? 'border-2 border-primary bg-secondary'
+                    : 'border-border bg-card hover:border-primary disabled:opacity-40 disabled:hover:border-border'
+                }`}
+              >
+                <span
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {active ? <Check size={18} /> : <BookOpen size={18} />}
+                </span>
+                <p className="mt-3 text-sm font-bold">{subjectMeta[id].short}</p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-4 rounded-2xl bg-secondary p-6 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            aria-label="Choose a different stream"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:border-primary hover:text-primary"
-          >
-            <ArrowLeft size={18} />
-          </button>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <Timer size={20} />
+          </span>
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-primary">{stream.name} stream</p>
-            <h2 className="font-heading text-lg font-bold">2. Choose a subject</h2>
+            <p className="font-heading text-sm font-bold">2 hours · {totalQuestions} questions</p>
+            <p className="text-xs text-muted-foreground">Scored out of 400</p>
           </div>
         </div>
-        <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-primary">
-          <ListChecks size={14} />
-          4 standard JAMB subjects
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stream.subjectIds.map((subjectId) => {
-          const meta = subjectMeta[subjectId]
-          const count = questionBank[subjectId]?.length ?? 0
-          const isCompulsory = subjectId === 'english'
-          return (
-            <Link
-              key={subjectId}
-              to={`/practice/session?subject=${subjectId}&stream=${stream.id}`}
-              className="group flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
-            >
-              <div className="flex items-start justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
-                  <CheckCircle2 size={20} />
-                </span>
-                {isCompulsory && (
-                  <span className="rounded-full bg-tertiary/10 px-2.5 py-1 text-[11px] font-bold text-tertiary">
-                    Compulsory
-                  </span>
-                )}
-              </div>
-              <h3 className="mt-5 font-heading text-base font-bold">{meta.name}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{count} practice questions</p>
-              <div className="mt-5 flex items-center text-sm font-semibold text-primary">
-                Start practicing
-                <ArrowRight size={16} className="ml-1 transition-transform group-hover:translate-x-0.5" />
-              </div>
-            </Link>
-          )
-        })}
-      </div>
-
-      <div className="mt-5 rounded-xl bg-secondary p-5 text-sm leading-6 text-secondary-foreground">
-        Every JAMB candidate sits <b>Use of English</b> plus three subjects from their chosen
-        stream — the {stream.name.toLowerCase()} stream pairs English with{' '}
-        {stream.subjectIds
-          .filter((id) => id !== 'english')
-          .map((id) => subjectMeta[id].name)
-          .join(', ')}
-        .
+        <button
+          disabled={!ready}
+          onClick={onStart}
+          className="flex min-h-11 items-center justify-center rounded-lg bg-primary px-6 font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90 disabled:opacity-40"
+        >
+          Start Exam
+          <ArrowRight size={18} className="ml-2" />
+        </button>
       </div>
     </section>
   )

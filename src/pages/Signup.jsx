@@ -76,7 +76,7 @@ export default function Signup() {
             Create your free account.
           </h1>
           <p className="mt-3 text-pretty text-sm leading-6 text-slate-500">
-            Join EXAMHUB and start practicing for JAMB, WAEC, NECO and Post-UTME.
+            Join EXAMHUB and start practicing original JAMB-standard questions.
           </p>
         </div>
 

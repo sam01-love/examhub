@@ -1,675 +1,716 @@
 // ---------------------------------------------------------------------------
-// JAMB is sat as a combination of the Use of English (compulsory for every
-// candidate) plus three subjects drawn from the candidate's chosen stream.
-// ExamHub organises practice around that reality: pick a stream, then one of
-// its four standard subjects, then practice. Swap `questionBank` for a
-// Supabase `questions` table query once real bank content is ready — the
-// shape (id, prompt, instruction, options, answer, explanation) is designed
-// to map directly onto a table with those columns.
+// JAMB subject combination rules
 // ---------------------------------------------------------------------------
-
-export const streams = [
-  {
-    id: 'science',
-    name: 'Science',
-    tagline: 'Engineering, medicine & pure sciences',
-    description: 'For candidates targeting Medicine, Engineering, Computer Science and related courses.',
-    icon: 'FlaskConical',
-    subjectIds: ['english', 'mathematics', 'physics', 'chemistry'],
-  },
-  {
-    id: 'arts',
-    name: 'Arts',
-    tagline: 'Humanities, law & mass communication',
-    description: 'For candidates targeting Law, Mass Communication, Languages and related courses.',
-    icon: 'Landmark',
-    subjectIds: ['english', 'literature', 'government', 'crs'],
-  },
-  {
-    id: 'commercial',
-    name: 'Commercial',
-    tagline: 'Business, accounting & economics',
-    description: 'For candidates targeting Accounting, Business Admin, Economics and related courses.',
-    icon: 'Briefcase',
-    subjectIds: ['english', 'mathematics', 'economics', 'commerce'],
-  },
-]
+// Every stream has:
+//  - compulsory: subjects every candidate in that stream must sit (always
+//    includes "english")
+//  - electivePool: subjects the candidate can choose from to fill the
+//    remaining slots
+//  - electiveCount: how many subjects must be picked from electivePool
+// compulsory.length + electiveCount is always 4, matching JAMB's 4-subject
+// UTME combination.
+// ---------------------------------------------------------------------------
 
 export const subjectMeta = {
   english: { name: 'Use of English', short: 'English', color: 'blue' },
   mathematics: { name: 'Mathematics', short: 'Maths', color: 'indigo' },
   physics: { name: 'Physics', short: 'Physics', color: 'sky' },
   chemistry: { name: 'Chemistry', short: 'Chemistry', color: 'green' },
+  biology: { name: 'Biology', short: 'Biology', color: 'emerald' },
   literature: { name: 'Literature-in-English', short: 'Literature', color: 'rose' },
   government: { name: 'Government', short: 'Government', color: 'amber' },
   crs: { name: 'Christian Religious Studies', short: 'CRS', color: 'purple' },
+  history: { name: 'History', short: 'History', color: 'fuchsia' },
   economics: { name: 'Economics', short: 'Economics', color: 'teal' },
   commerce: { name: 'Commerce', short: 'Commerce', color: 'orange' },
+  accounts: { name: 'Financial Accounting', short: 'Accounts', color: 'cyan' },
 }
+
+export const streams = [
+  {
+    id: 'science',
+    name: 'Science',
+    tagline: 'Engineering, medicine & pure sciences',
+    icon: 'FlaskConical',
+    compulsory: ['english', 'physics', 'chemistry'],
+    electivePool: ['mathematics', 'biology'],
+    electiveCount: 1,
+  },
+  {
+    id: 'arts',
+    name: 'Arts',
+    tagline: 'Humanities, law & mass communication',
+    icon: 'Landmark',
+    compulsory: ['english'],
+    electivePool: ['literature', 'government', 'crs', 'history'],
+    electiveCount: 3,
+  },
+  {
+    id: 'commercial',
+    name: 'Commercial',
+    tagline: 'Business, accounting & economics',
+    icon: 'Briefcase',
+    compulsory: ['english', 'mathematics'],
+    electivePool: ['economics', 'commerce', 'accounts'],
+    electiveCount: 2,
+  },
+]
 
 export const targetScores = ['180+', '200+', '250+', '300+', '350+']
 
-// A small, original bank of JAMB-standard practice questions for every
-// subject across the three streams. Each subject currently ships with 8
-// questions; extend or replace per subject as the real content library grows.
-export const questionBank = {
-  english: [
-    {
-      id: 'eng-1',
-      instruction: 'Vocabulary — choose the word nearest in meaning',
-      prompt: 'The manager was too diligent to overlook the error in the report.',
-      options: ['Careless', 'Hardworking', 'Forgetful', 'Impatient'],
-      answer: 1,
-      explanation: '"Diligent" describes someone who works with care and steady effort, so "hardworking" is nearest in meaning.',
-    },
-    {
-      id: 'eng-2',
-      instruction: 'Antonyms — choose the word opposite in meaning',
-      prompt: 'Choose the word most opposite in meaning to "scarce".',
-      options: ['Rare', 'Abundant', 'Costly', 'Hidden'],
-      answer: 1,
-      explanation: '"Scarce" means in short supply; its opposite is "abundant", meaning present in large quantities.',
-    },
-    {
-      id: 'eng-3',
-      instruction: 'Grammar — select the option that best completes the sentence',
-      prompt: 'Neither the students nor the teacher ___ aware of the change in schedule.',
-      options: ['were', 'was', 'are', 'have been'],
-      answer: 1,
-      explanation: 'With "neither...nor", the verb agrees with the subject nearer to it — "the teacher" is singular, so "was" is correct.',
-    },
-    {
-      id: 'eng-4',
-      instruction: 'Idioms — choose the correct meaning',
-      prompt: 'What does it mean to "let the cat out of the bag"?',
-      options: ['To free an animal', 'To reveal a secret accidentally', 'To cause confusion', 'To lose something valuable'],
-      answer: 1,
-      explanation: 'The idiom "let the cat out of the bag" means to accidentally reveal a secret.',
-    },
-    {
-      id: 'eng-5',
-      instruction: 'Collective nouns — choose the correct word',
-      prompt: 'Choose the correct collective noun to complete: "A ___ of lions crossed the savannah."',
-      options: ['flock', 'pride', 'herd', 'school'],
-      answer: 1,
-      explanation: 'A group of lions is called a "pride".',
-    },
-    {
-      id: 'eng-6',
-      instruction: 'Spelling — choose the correctly spelt word',
-      prompt: 'Which of the following is spelt correctly?',
-      options: ['Ocassion', 'Occassion', 'Occasion', 'Occation'],
-      answer: 2,
-      explanation: '"Occasion" is the correct spelling, with a double "c" and a single "s".',
-    },
-    {
-      id: 'eng-7',
-      instruction: 'Prepositions — select the correct option',
-      prompt: 'She is married ___ a civil engineer.',
-      options: ['with', 'to', 'by', 'for'],
-      answer: 1,
-      explanation: 'The correct preposition to use with "married" in this context is "to": "married to".',
-    },
-    {
-      id: 'eng-8',
-      instruction: 'Reading comprehension — draw the correct inference',
-      prompt: 'A student who "crammed all night before the exam" most likely means the student:',
-      options: [
-        'Studied calmly over several weeks',
-        'Memorised material hurriedly at the last minute',
-        'Skipped the exam entirely',
-        'Taught the material to classmates',
-      ],
-      answer: 1,
-      explanation: 'To "cram" means to study intensively and hurriedly within a short period, typically just before a test.',
-    },
-  ],
+// JAMB question-count standard: 60 for Use of English, 40 for every other subject
+export function subjectQuestionCount(subjectId) {
+  return subjectId === 'english' ? 60 : 40
+}
 
-  mathematics: [
-    {
-      id: 'math-1',
-      instruction: 'Number bases',
-      prompt: 'Convert 101101₂ to base 10.',
-      options: ['43', '44', '45', '46'],
-      answer: 2,
-      explanation: '101101₂ = (1×32)+(0×16)+(1×8)+(1×4)+(0×2)+(1×1) = 32+8+4+1 = 45.',
-    },
-    {
-      id: 'math-2',
-      instruction: 'Indices',
-      prompt: 'Simplify: (2³ × 2⁴) ÷ 2⁵',
-      options: ['2', '4', '8', '16'],
-      answer: 1,
-      explanation: 'Using laws of indices: 2^(3+4-5) = 2² = 4.',
-    },
-    {
-      id: 'math-3',
-      instruction: 'Logarithms',
-      prompt: 'Given that log₁₀2 = 0.3010, find log₁₀8.',
-      options: ['0.6020', '0.9030', '1.2040', '0.3010'],
-      answer: 1,
-      explanation: 'log₁₀8 = log₁₀2³ = 3 × log₁₀2 = 3 × 0.3010 = 0.9030.',
-    },
-    {
-      id: 'math-4',
-      instruction: 'Sets',
-      prompt: 'In a class of 40 students, 25 like Mathematics, 20 like English, and 10 like both. How many like neither subject?',
-      options: ['3', '5', '8', '10'],
-      answer: 1,
-      explanation: 'Students liking at least one subject = 25 + 20 − 10 = 35. Those liking neither = 40 − 35 = 5.',
-    },
-    {
-      id: 'math-5',
-      instruction: 'Simultaneous equations',
-      prompt: 'If x + y = 7 and x − y = 1, find the value of xy.',
-      options: ['10', '12', '14', '16'],
-      answer: 1,
-      explanation: 'Adding the equations: 2x = 8, so x = 4, and y = 3. Therefore xy = 4 × 3 = 12.',
-    },
-    {
-      id: 'math-6',
-      instruction: 'Quadratic equations',
-      prompt: 'Find the sum of the roots of x² − 5x + 6 = 0.',
-      options: ['3', '5', '6', '−5'],
-      answer: 1,
-      explanation: 'For ax² + bx + c = 0, the sum of roots = −b/a = −(−5)/1 = 5.',
-    },
-    {
-      id: 'math-7',
-      instruction: 'Sequences and series',
-      prompt: 'Find the 10th term of the arithmetic progression 3, 7, 11, 15, ...',
-      options: ['35', '37', '39', '41'],
-      answer: 2,
-      explanation: 'Tₙ = a + (n−1)d = 3 + (10−1)×4 = 3 + 36 = 39.',
-    },
-    {
-      id: 'math-8',
-      instruction: 'Mensuration',
-      prompt: 'Find the area of a circle of radius 7 cm. (Take π = 22/7)',
-      options: ['144 cm²', '150 cm²', '154 cm²', '160 cm²'],
-      answer: 2,
-      explanation: 'Area = πr² = (22/7) × 7 × 7 = 154 cm².',
-    },
-  ],
-
-  physics: [
-    {
-      id: 'phy-1',
-      instruction: 'Units and measurement',
-      prompt: 'What is the SI unit of force?',
-      options: ['Joule', 'Newton', 'Watt', 'Pascal'],
-      answer: 1,
-      explanation: 'Force is measured in newtons (N), defined from Newton\'s second law, F = ma.',
-    },
-    {
-      id: 'phy-2',
-      instruction: 'Current electricity',
-      prompt: 'A current of 2 A flows through a resistor of 5 Ω. Find the voltage across the resistor.',
-      options: ['2.5 V', '7 V', '10 V', '20 V'],
-      answer: 2,
-      explanation: "By Ohm's law, V = IR = 2 × 5 = 10 V.",
-    },
-    {
-      id: 'phy-3',
-      instruction: 'Waves',
-      prompt: 'A wave has a frequency of 50 Hz and a wavelength of 2 m. What is its speed?',
-      options: ['25 m/s', '52 m/s', '100 m/s', '200 m/s'],
-      answer: 2,
-      explanation: 'Speed = frequency × wavelength = 50 × 2 = 100 m/s.',
-    },
-    {
-      id: 'phy-4',
-      instruction: 'Mechanics — Newton\'s laws',
-      prompt: 'A resultant force of 10 N acts on a body of mass 5 kg. Find its acceleration.',
-      options: ['0.5 m/s²', '2 m/s²', '5 m/s²', '15 m/s²'],
-      answer: 1,
-      explanation: 'From F = ma, a = F/m = 10/5 = 2 m/s².',
-    },
-    {
-      id: 'phy-5',
-      instruction: 'Reflection of light',
-      prompt: 'For a plane mirror, the angle of incidence is related to the angle of reflection how?',
-      options: [
-        'The angle of reflection is always twice the angle of incidence',
-        'The angle of reflection equals the angle of incidence',
-        'The angle of reflection is always 90°',
-        'There is no fixed relationship',
-      ],
-      answer: 1,
-      explanation: 'The law of reflection states that the angle of incidence equals the angle of reflection, measured from the normal.',
-    },
-    {
-      id: 'phy-6',
-      instruction: 'Density',
-      prompt: 'A substance has a mass of 20 g and a volume of 4 cm³. Find its density.',
-      options: ['4 g/cm³', '5 g/cm³', '16 g/cm³', '80 g/cm³'],
-      answer: 1,
-      explanation: 'Density = mass/volume = 20/4 = 5 g/cm³.',
-    },
-    {
-      id: 'phy-7',
-      instruction: 'Work, energy and power',
-      prompt: 'Find the kinetic energy of a 2 kg object moving at 3 m/s.',
-      options: ['3 J', '6 J', '9 J', '18 J'],
-      answer: 2,
-      explanation: 'KE = ½mv² = ½ × 2 × 3² = ½ × 2 × 9 = 9 J.',
-    },
-    {
-      id: 'phy-8',
-      instruction: 'Circuits',
-      prompt: 'Two resistors of 4 Ω and 6 Ω are connected in series. Find the total resistance.',
-      options: ['2 Ω', '2.4 Ω', '10 Ω', '24 Ω'],
-      answer: 2,
-      explanation: 'For resistors in series, total resistance = sum of individual resistances = 4 + 6 = 10 Ω.',
-    },
-  ],
-
-  chemistry: [
-    {
-      id: 'chem-1',
-      instruction: 'Periodic table',
-      prompt: 'What is the chemical symbol for sodium?',
-      options: ['So', 'Sd', 'Na', 'S'],
-      answer: 2,
-      explanation: 'Sodium\'s symbol, Na, comes from its Latin name "Natrium".',
-    },
-    {
-      id: 'chem-2',
-      instruction: 'Atomic structure',
-      prompt: 'An atom has 11 protons and 12 neutrons. What is its mass number?',
-      options: ['11', '12', '22', '23'],
-      answer: 3,
-      explanation: 'Mass number = number of protons + number of neutrons = 11 + 12 = 23.',
-    },
-    {
-      id: 'chem-3',
-      instruction: 'Chemical bonding',
-      prompt: 'Which type of bond is formed by the complete transfer of electrons from one atom to another?',
-      options: ['Covalent bond', 'Ionic bond', 'Metallic bond', 'Hydrogen bond'],
-      answer: 1,
-      explanation: 'An ionic bond forms when electrons are transferred completely, producing oppositely charged ions that attract each other.',
-    },
-    {
-      id: 'chem-4',
-      instruction: 'Acids and bases',
-      prompt: 'A solution has a pH of 3. What can be said about the solution?',
-      options: ['It is strongly basic', 'It is neutral', 'It is acidic', 'It has no hydrogen ions'],
-      answer: 2,
-      explanation: 'A pH below 7 indicates an acidic solution; a pH of 3 is strongly acidic.',
-    },
-    {
-      id: 'chem-5',
-      instruction: 'Stoichiometry',
-      prompt: 'What is the molar mass of water, H₂O? (H = 1, O = 16)',
-      options: ['16 g/mol', '17 g/mol', '18 g/mol', '19 g/mol'],
-      answer: 2,
-      explanation: 'Molar mass of H₂O = (2×1) + 16 = 18 g/mol.',
-    },
-    {
-      id: 'chem-6',
-      instruction: 'Separation techniques',
-      prompt: 'Which method is most suitable for separating a mixture of sand and water?',
-      options: ['Distillation', 'Filtration', 'Chromatography', 'Evaporation'],
-      answer: 1,
-      explanation: 'Filtration separates an insoluble solid (sand) from a liquid (water) using a filter medium.',
-    },
-    {
-      id: 'chem-7',
-      instruction: 'Organic chemistry',
-      prompt: 'Which functional group is present in all alcohols?',
-      options: ['-COOH', '-OH', '-CHO', '-NH₂'],
-      answer: 1,
-      explanation: 'Alcohols are characterised by the hydroxyl (-OH) functional group attached to a carbon chain.',
-    },
-    {
-      id: 'chem-8',
-      instruction: 'Gas laws',
-      prompt: 'A fixed mass of gas at constant temperature has its pressure doubled. What happens to its volume?',
-      options: ['It doubles', 'It halves', 'It stays the same', 'It quadruples'],
-      answer: 1,
-      explanation: "By Boyle's law, at constant temperature, pressure and volume are inversely proportional, so doubling pressure halves the volume.",
-    },
-  ],
-
-  literature: [
-    {
-      id: 'lit-1',
-      instruction: 'Figures of speech',
-      prompt: 'Identify the figure of speech in: "The wind whispered through the trees."',
-      options: ['Simile', 'Personification', 'Metaphor', 'Hyperbole'],
-      answer: 1,
-      explanation: 'Giving the wind the human ability to "whisper" is personification — attributing human qualities to a non-human thing.',
-    },
-    {
-      id: 'lit-2',
-      instruction: 'Poetry',
-      prompt: 'A poem of fourteen lines, often exploring a single theme with a structured rhyme scheme, is called a:',
-      options: ['Ballad', 'Sonnet', 'Elegy', 'Ode'],
-      answer: 1,
-      explanation: 'A sonnet is a fourteen-line poem, traditionally written in a fixed rhyme scheme.',
-    },
-    {
-      id: 'lit-3',
-      instruction: 'Figures of speech',
-      prompt: 'What term describes the repetition of consonant sounds at the beginning of neighbouring words, as in "wild and windy"?',
-      options: ['Assonance', 'Alliteration', 'Onomatopoeia', 'Repetition'],
-      answer: 1,
-      explanation: '"Wild" and "windy" both begin with the "w" sound — this repeated initial consonant sound is alliteration.',
-    },
-    {
-      id: 'lit-4',
-      instruction: 'Prose forms',
-      prompt: 'A short story that teaches a moral lesson and often features animal characters is called a:',
-      options: ['Fable', 'Myth', 'Legend', 'Epic'],
-      answer: 0,
-      explanation: 'A fable is a brief tale, often with animal characters, designed to convey a moral lesson.',
-    },
-    {
-      id: 'lit-5',
-      instruction: 'Drama',
-      prompt: 'A speech in which a character alone on stage reveals their private thoughts to the audience is called a:',
-      options: ['Monologue', 'Soliloquy', 'Dialogue', 'Aside'],
-      answer: 1,
-      explanation: 'A soliloquy is delivered by a character alone on stage, revealing inner thoughts directly to the audience.',
-    },
-    {
-      id: 'lit-6',
-      instruction: 'Elements of a story',
-      prompt: 'The term for the time and place in which the events of a story occur is:',
-      options: ['Plot', 'Setting', 'Theme', 'Tone'],
-      answer: 1,
-      explanation: 'Setting refers to the time and location in which a narrative takes place.',
-    },
-    {
-      id: 'lit-7',
-      instruction: 'Figures of speech',
-      prompt: 'Which figure of speech compares two unlike things using "like" or "as"?',
-      options: ['Metaphor', 'Simile', 'Irony', 'Symbolism'],
-      answer: 1,
-      explanation: 'A simile makes an explicit comparison using "like" or "as", e.g. "as brave as a lion".',
-    },
-    {
-      id: 'lit-8',
-      instruction: 'Literary terms',
-      prompt: 'The central message or insight about life conveyed by a literary work is called its:',
-      options: ['Theme', 'Motif', 'Climax', 'Exposition'],
-      answer: 0,
-      explanation: 'The theme is the underlying message or central idea a literary work communicates.',
-    },
-  ],
-
-  government: [
-    {
-      id: 'gov-1',
-      instruction: 'Systems of government',
-      prompt: 'A system of government in which absolute power is concentrated in a single ruler is called:',
-      options: ['Democracy', 'Autocracy', 'Theocracy', 'Oligarchy'],
-      answer: 1,
-      explanation: 'Autocracy is a system of government where one person holds absolute, unchecked power.',
-    },
-    {
-      id: 'gov-2',
-      instruction: 'Concepts of government',
-      prompt: 'The doctrine that government powers should be divided among the executive, legislature and judiciary is known as:',
-      options: ['Rule of law', 'Separation of powers', 'Federalism', 'Fundamental human rights'],
-      answer: 1,
-      explanation: 'Separation of powers divides governmental authority among three distinct arms to prevent abuse of power.',
-    },
-    {
-      id: 'gov-3',
-      instruction: 'Organs of government',
-      prompt: 'How many arms of government are generally recognised under the doctrine of separation of powers?',
-      options: ['Two', 'Three', 'Four', 'Five'],
-      answer: 1,
-      explanation: 'The three arms are the executive, the legislature, and the judiciary.',
-    },
-    {
-      id: 'gov-4',
-      instruction: 'Nigerian constitution',
-      prompt: 'The 1999 Constitution establishes Nigeria as which type of state?',
-      options: ['A unitary state', 'A federal state', 'A confederal state', 'A theocratic state'],
-      answer: 1,
-      explanation: 'Nigeria operates a federal system, sharing powers between a central government and constituent states.',
-    },
-    {
-      id: 'gov-5',
-      instruction: 'Legislature',
-      prompt: 'A legislature made up of two chambers, such as a senate and a house of representatives, is described as:',
-      options: ['Unicameral', 'Bicameral', 'Tricameral', 'Multicameral'],
-      answer: 1,
-      explanation: '"Bicameral" describes a legislature with two chambers or houses.',
-    },
-    {
-      id: 'gov-6',
-      instruction: 'Political concepts',
-      prompt: 'The right of every adult citizen, regardless of status, to vote in elections is called:',
-      options: ['Universal adult suffrage', 'Proportional representation', 'Electoral college', 'Franchise restriction'],
-      answer: 0,
-      explanation: 'Universal adult suffrage grants every qualified adult citizen the right to vote.',
-    },
-    {
-      id: 'gov-7',
-      instruction: 'Systems of government',
-      prompt: 'In a presidential system of government, who typically serves as the head of the executive arm?',
-      options: ['The Prime Minister', 'The President', 'The Speaker', 'The Chief Justice'],
-      answer: 1,
-      explanation: 'Under a presidential system, the President is both head of state and head of the executive branch.',
-    },
-    {
-      id: 'gov-8',
-      instruction: 'Party systems',
-      prompt: 'A political system dominated by only two major parties is referred to as a:',
-      options: ['One-party system', 'Two-party system', 'Multi-party system', 'No-party system'],
-      answer: 1,
-      explanation: 'A two-party system is one in which two major parties dominate the political landscape.',
-    },
-  ],
-
-  crs: [
-    {
-      id: 'crs-1',
-      instruction: 'Old Testament',
-      prompt: 'Who led the Israelites out of slavery in Egypt?',
-      options: ['Abraham', 'Moses', 'Joshua', 'David'],
-      answer: 1,
-      explanation: 'Moses led the Israelites out of Egypt, as recorded in the Book of Exodus.',
-    },
-    {
-      id: 'crs-2',
-      instruction: 'Old Testament',
-      prompt: 'The account of the creation of the world is recorded in which book of the Bible?',
-      options: ['Exodus', 'Genesis', 'Leviticus', 'Numbers'],
-      answer: 1,
-      explanation: 'Genesis, the first book of the Bible, records the creation account.',
-    },
-    {
-      id: 'crs-3',
-      instruction: 'Old Testament',
-      prompt: 'Where did Moses receive the Ten Commandments?',
-      options: ['Mount Sinai', 'Mount Carmel', 'Mount Ararat', 'Mount Zion'],
-      answer: 0,
-      explanation: 'Moses received the Ten Commandments from God on Mount Sinai.',
-    },
-    {
-      id: 'crs-4',
-      instruction: 'New Testament',
-      prompt: 'Which disciple betrayed Jesus to the religious authorities?',
-      options: ['Peter', 'John', 'Judas Iscariot', 'Thomas'],
-      answer: 2,
-      explanation: 'Judas Iscariot betrayed Jesus for thirty pieces of silver.',
-    },
-    {
-      id: 'crs-5',
-      instruction: 'New Testament',
-      prompt: 'The Beatitudes, which begin "Blessed are...", form part of which teaching of Jesus?',
-      options: ['The Parable of the Sower', 'The Sermon on the Mount', 'The Last Supper discourse', 'The Great Commission'],
-      answer: 1,
-      explanation: 'The Beatitudes open the Sermon on the Mount, recorded in Matthew chapters 5–7.',
-    },
-    {
-      id: 'crs-6',
-      instruction: 'Old Testament',
-      prompt: 'According to Genesis, who was the first man created by God?',
-      options: ['Noah', 'Cain', 'Adam', 'Seth'],
-      answer: 2,
-      explanation: 'Genesis records Adam as the first man created by God.',
-    },
-    {
-      id: 'crs-7',
-      instruction: 'New Testament',
-      prompt: 'The Parable of the Good Samaritan primarily teaches the lesson of:',
-      options: ['Patience in suffering', 'Loving one\'s neighbour regardless of background', 'The dangers of wealth', 'Forgiveness of sins'],
-      answer: 1,
-      explanation: 'The parable teaches that true neighbourliness means showing compassion to anyone in need, regardless of background.',
-    },
-    {
-      id: 'crs-8',
-      instruction: 'New Testament',
-      prompt: 'How many apostles did Jesus choose as his closest disciples?',
-      options: ['Seven', 'Ten', 'Twelve', 'Fourteen'],
-      answer: 2,
-      explanation: 'Jesus chose twelve apostles to be his closest followers.',
-    },
-  ],
-
-  economics: [
-    {
-      id: 'eco-1',
-      instruction: 'Basic concepts',
-      prompt: 'The economic problem that arises because human wants are unlimited but resources are limited is called:',
-      options: ['Inflation', 'Scarcity', 'Monopoly', 'Recession'],
-      answer: 1,
-      explanation: 'Scarcity describes the fundamental economic problem of limited resources relative to unlimited wants.',
-    },
-    {
-      id: 'eco-2',
-      instruction: 'Demand and supply',
-      prompt: 'According to the law of demand, when the price of a good rises, all else being equal, quantity demanded will:',
-      options: ['Increase', 'Decrease', 'Remain constant', 'Rise then fall'],
-      answer: 1,
-      explanation: 'The law of demand states that price and quantity demanded are inversely related, so a price rise reduces quantity demanded.',
-    },
-    {
-      id: 'eco-3',
-      instruction: 'Basic concepts',
-      prompt: 'The value of the next best alternative given up when a choice is made is known as:',
-      options: ['Marginal cost', 'Opportunity cost', 'Sunk cost', 'Fixed cost'],
-      answer: 1,
-      explanation: 'Opportunity cost is the value of the best forgone alternative when a decision is made.',
-    },
-    {
-      id: 'eco-4',
-      instruction: 'Unemployment',
-      prompt: 'Unemployment that occurs due to normal turnover, such as workers between jobs, is called:',
-      options: ['Structural unemployment', 'Cyclical unemployment', 'Frictional unemployment', 'Seasonal unemployment'],
-      answer: 2,
-      explanation: 'Frictional unemployment refers to short-term unemployment as people transition between jobs.',
-    },
-    {
-      id: 'eco-5',
-      instruction: 'Inflation',
-      prompt: 'A persistent rise in the general price level of goods and services in an economy is called:',
-      options: ['Deflation', 'Inflation', 'Stagnation', 'Devaluation'],
-      answer: 1,
-      explanation: 'Inflation refers to a sustained increase in the general price level over time.',
-    },
-    {
-      id: 'eco-6',
-      instruction: 'Factors of production',
-      prompt: 'Which of the following is NOT one of the four traditional factors of production?',
-      options: ['Land', 'Labour', 'Capital', 'Inflation'],
-      answer: 3,
-      explanation: 'The four factors of production are land, labour, capital, and entrepreneurship. Inflation is not a factor of production.',
-    },
-    {
-      id: 'eco-7',
-      instruction: 'National income',
-      prompt: 'The total monetary value of all finished goods and services produced within a country in a given period is called:',
-      options: ['GNP', 'GDP', 'Net income', 'Per capita income'],
-      answer: 1,
-      explanation: 'Gross Domestic Product (GDP) measures the total value of goods and services produced within a country\'s borders.',
-    },
-    {
-      id: 'eco-8',
-      instruction: 'Demand and supply',
-      prompt: 'The point at which the quantity demanded of a good equals the quantity supplied is called:',
-      options: ['Market failure', 'Equilibrium', 'Surplus', 'Elasticity'],
-      answer: 1,
-      explanation: 'Market equilibrium occurs where the demand and supply curves intersect, so quantity demanded equals quantity supplied.',
-    },
-  ],
-
-  commerce: [
-    {
-      id: 'com-1',
-      instruction: 'Basic concepts',
-      prompt: 'The sum total of activities involved in the buying and selling of goods, including aids to trade, is called:',
-      options: ['Trade', 'Commerce', 'Industry', 'Production'],
-      answer: 1,
-      explanation: 'Commerce encompasses trade plus all the activities (such as transport, banking, and insurance) that assist trade.',
-    },
-    {
-      id: 'com-2',
-      instruction: 'Classification of trade',
-      prompt: 'Trade carried out between buyers and sellers within the same country is called:',
-      options: ['Home trade', 'Foreign trade', 'Entrepot trade', 'Bilateral trade'],
-      answer: 0,
-      explanation: 'Home trade (or internal trade) refers to buying and selling of goods within a single country.',
-    },
-    {
-      id: 'com-3',
-      instruction: 'Aids to trade',
-      prompt: 'A contract in which one party agrees to compensate another for a specified loss in exchange for a premium is called:',
-      options: ['A mortgage', 'Insurance', 'A hire-purchase agreement', 'A bill of exchange'],
-      answer: 1,
-      explanation: 'Insurance is a contract where an insurer compensates the insured for specified losses in return for premium payments.',
-    },
-    {
-      id: 'com-4',
-      instruction: 'Documents in trade',
-      prompt: 'A document issued by a shipping company as evidence of a contract of carriage and receipt of goods is called a:',
-      options: ['Invoice', 'Bill of lading', 'Cheque', 'Receipt'],
-      answer: 1,
-      explanation: 'A bill of lading serves as a receipt for goods shipped and evidence of the contract of carriage.',
-    },
-    {
-      id: 'com-5',
-      instruction: 'Channels of distribution',
-      prompt: 'A trader who buys goods in bulk from producers and sells in smaller quantities to retailers is called a:',
-      options: ['Retailer', 'Wholesaler', 'Consumer', 'Broker'],
-      answer: 1,
-      explanation: 'A wholesaler buys in bulk from producers and breaks the goods into smaller lots for retailers.',
-    },
-    {
-      id: 'com-6',
-      instruction: 'Banking',
-      prompt: 'A written order instructing a bank to pay a specified sum from one\'s account is called a:',
-      options: ['Cheque', 'Promissory note', 'Bill of lading', 'Invoice'],
-      answer: 0,
-      explanation: 'A cheque is a written instruction to a bank to pay a stated amount from the account holder\'s funds.',
-    },
-    {
-      id: 'com-7',
-      instruction: 'Aids to trade',
-      prompt: 'The storage of goods until they are needed for sale or use is known as:',
-      options: ['Warehousing', 'Advertising', 'Branding', 'Packaging'],
-      answer: 0,
-      explanation: 'Warehousing involves the storage of goods, bridging the time gap between production and consumption.',
-    },
-    {
-      id: 'com-8',
-      instruction: 'Business organisation',
-      prompt: 'A market where shares and stocks of public companies are bought and sold is called a:',
-      options: ['Money market', 'Stock exchange', 'Commodity market', 'Foreign exchange market'],
-      answer: 1,
-      explanation: 'A stock exchange is an organised market for buying and selling shares and stocks of public companies.',
-    },
-  ],
+// All subjects a stream can present (used by Study Mode's subject picker)
+export function streamSubjectIds(stream) {
+  return [...stream.compulsory, ...stream.electivePool]
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard / progress display data — swap for real analytics once a
-// results table exists.
+// Question-bank generation helpers
+// ---------------------------------------------------------------------------
+
+function safeDistractors(correct) {
+  const offsets = [2, -2, 3, -3, 5, -5, 4, -4, 6, -6, 7, -7]
+  const out = []
+  for (const off of offsets) {
+    const v = correct + off
+    if (v > 0 && v !== correct && !out.includes(v)) out.push(v)
+    if (out.length === 3) break
+  }
+  return out
+}
+
+function numericMCQ(id, instruction, prompt, correct, explanation, position, unit = '') {
+  const format = (n) => `${n}${unit}`
+  const options = safeDistractors(correct).map(format)
+  options.splice(position, 0, format(correct))
+  return { id, instruction, prompt, options, answer: position, explanation }
+}
+
+// Builds one MCQ per [term, description] pair, using nearby pairs (cyclically)
+// as distractors so every question is guaranteed 3 unique wrong answers.
+function factBank(prefix, instruction, pairs, promptFn, explanationFn) {
+  return pairs.map(([term, def], i) => {
+    const distractors = [1, 2, 3].map((o) => pairs[(i + o) % pairs.length][1])
+    const position = i % 4
+    const options = [...distractors]
+    options.splice(position, 0, def)
+    return {
+      id: `${prefix}-${i + 1}`,
+      instruction,
+      prompt: promptFn(term),
+      options,
+      answer: position,
+      explanation: explanationFn(term, def),
+    }
+  })
+}
+
+const describePrompt = (t) => `Which of the following best describes "${t}"?`
+const describeExplanation = (t, d) => `"${t}" refers to: ${d}.`
+
+// ---------------------------------------------------------------------------
+// Use of English — 60 questions (vocabulary, antonyms, idioms, grammar)
+// ---------------------------------------------------------------------------
+
+const synonymPairs = [
+  ['diligent', 'hardworking'], ['abundant', 'plentiful'], ['meticulous', 'careful'],
+  ['reluctant', 'unwilling'], ['candid', 'honest'], ['ambiguous', 'unclear'],
+  ['benevolent', 'kind'], ['concise', 'brief'], ['deteriorate', 'worsen'],
+  ['eloquent', 'articulate'], ['frugal', 'thrifty'], ['hostile', 'unfriendly'],
+  ['immense', 'huge'], ['jubilant', 'joyful'], ['lethargic', 'sluggish'],
+  ['meager', 'scanty'], ['notorious', 'infamous'], ['obstinate', 'stubborn'],
+  ['plausible', 'believable'], ['tranquil', 'peaceful'],
+]
+
+const antonymPairs = [
+  ['scarce', 'abundant'], ['genuine', 'fake'], ['courageous', 'cowardly'],
+  ['generous', 'stingy'], ['optimistic', 'pessimistic'], ['permanent', 'temporary'],
+  ['voluntary', 'compulsory'], ['ancient', 'modern'], ['victory', 'defeat'],
+  ['expand', 'contract'], ['praise', 'criticize'], ['increase', 'decrease'],
+  ['include', 'exclude'], ['major', 'minor'], ['arrival', 'departure'],
+]
+
+const idiomPairs = [
+  ['let the cat out of the bag', 'reveal a secret accidentally'],
+  ['break the ice', 'ease tension in a social situation'],
+  ['once in a blue moon', 'very rarely'],
+  ['cost an arm and a leg', 'be very expensive'],
+  ['hit the nail on the head', 'be exactly right'],
+  ['under the weather', 'feeling slightly ill'],
+  ['burn the midnight oil', 'work late into the night'],
+  ['a piece of cake', 'something very easy'],
+  ['bite the bullet', 'endure a painful situation bravely'],
+  ['beat around the bush', 'avoid speaking directly'],
+  ['call it a day', 'stop working for the day'],
+  ['add fuel to the fire', 'make a bad situation worse'],
+  ['jump on the bandwagon', 'join a popular trend'],
+  ['keep an eye on', 'watch carefully'],
+  ['spill the beans', 'reveal a secret'],
+]
+
+const grammarQuestions = [
+  { id: 'eng-gram-1', instruction: 'Grammar', prompt: 'Neither the students nor the teacher ___ aware of the change.', options: ['were', 'was', 'are', 'have been'], answer: 1, explanation: 'With "neither...nor", the verb agrees with the nearer subject — "the teacher" is singular, so "was" is correct.' },
+  { id: 'eng-gram-2', instruction: 'Grammar', prompt: 'She is married ___ a civil engineer.', options: ['with', 'to', 'by', 'for'], answer: 1, explanation: 'The correct preposition is "to": "married to".' },
+  { id: 'eng-gram-3', instruction: 'Grammar', prompt: 'By this time next year, she ___ from university.', options: ['will graduate', 'will have graduated', 'has graduated', 'graduates'], answer: 1, explanation: 'A completed action before a future point uses the future perfect tense: "will have graduated".' },
+  { id: 'eng-gram-4', instruction: 'Grammar', prompt: 'Each of the candidates ___ given a number.', options: ['were', 'was', 'are', 'have been'], answer: 1, explanation: '"Each" is singular, so it takes a singular verb, "was".' },
+  { id: 'eng-gram-5', instruction: 'Grammar', prompt: 'He is the ___ of the two brothers.', options: ['taller', 'tall', 'tallest', 'more tall'], answer: 0, explanation: 'When comparing exactly two things, the comparative form ("taller") is used, not the superlative.' },
+  { id: 'eng-gram-6', instruction: 'Grammar', prompt: 'I look forward ___ hearing from you.', options: ['for', 'to', 'at', 'with'], answer: 1, explanation: '"Look forward to" is followed by a gerund, so "to" is correct.' },
+  { id: 'eng-gram-7', instruction: 'Grammar', prompt: 'If I ___ you, I would apologise.', options: ['am', 'was', 'were', 'be'], answer: 2, explanation: 'In hypothetical conditionals, "were" is used for all subjects: "If I were you".' },
+  { id: 'eng-gram-8', instruction: 'Grammar', prompt: 'The committee ___ divided on the issue.', options: ['is', 'are', 'was', 'has'], answer: 1, explanation: 'When a collective noun is treated as individuals with differing opinions, a plural verb, "are", is used.' },
+  { id: 'eng-gram-9', instruction: 'Grammar', prompt: 'She has been living here ___ 2015.', options: ['for', 'since', 'from', 'during'], answer: 1, explanation: '"Since" is used with a specific starting point in time, such as a year.' },
+  { id: 'eng-gram-10', instruction: 'Grammar', prompt: 'Choose the correctly spelt word.', options: ['Occassion', 'Occasion', 'Ocassion', 'Occation'], answer: 1, explanation: '"Occasion" is spelt with a double "c" and a single "s".' },
+]
+
+export const englishQuestions = [
+  ...factBank('eng-syn', 'Vocabulary — synonyms', synonymPairs, (t) => `Choose the word nearest in meaning to "${t}".`, (t, d) => `"${t}" is closest in meaning to "${d}".`),
+  ...factBank('eng-ant', 'Vocabulary — antonyms', antonymPairs, (t) => `Choose the word most opposite in meaning to "${t}".`, (t, d) => `The opposite of "${t}" is "${d}".`),
+  ...factBank('eng-idiom', 'Idioms', idiomPairs, (t) => `What is the meaning of the idiom "${t}"?`, (t, d) => `The idiom "${t}" means: ${d}.`),
+  ...grammarQuestions,
+]
+
+// ---------------------------------------------------------------------------
+// Mathematics — 40 questions, generated from 8 numeric templates
+// ---------------------------------------------------------------------------
+
+function buildMathematicsQuestions() {
+  const qs = []
+  let pos = 0
+  const next = () => pos++ % 4
+
+  ;['1011', '10110', '11001', '101101', '111010'].forEach((bin, i) => {
+    const val = parseInt(bin, 2)
+    qs.push(numericMCQ(`math-1-${i + 1}`, 'Number bases', `Convert ${bin}₂ to base 10.`, val, `${bin}₂ = ${val} in base 10, found by summing the place values of each 1-bit.`, next()))
+  })
+
+  ;[[3, 4, 5], [2, 5, 4], [4, 3, 2], [5, 2, 1], [3, 3, 2]].forEach(([a, b, c], i) => {
+    const exp = a + b - c
+    const val = Math.pow(2, exp)
+    qs.push(numericMCQ(`math-2-${i + 1}`, 'Indices', `Simplify: (2^${a} × 2^${b}) ÷ 2^${c}`, val, `2^${a} × 2^${b} ÷ 2^${c} = 2^(${a}+${b}-${c}) = 2^${exp} = ${val}.`, next()))
+  })
+
+  ;[[15, 200], [20, 180], [25, 80], [10, 250], [30, 90]].forEach(([p, n], i) => {
+    const val = (p / 100) * n
+    qs.push(numericMCQ(`math-3-${i + 1}`, 'Percentages', `What is ${p}% of ${n}?`, val, `${p}% of ${n} = (${p}/100) × ${n} = ${val}.`, next()))
+  })
+
+  ;[[1000, 5, 2], [2000, 4, 3], [1500, 6, 2], [5000, 2, 3], [2500, 8, 1]].forEach(([p, r, t], i) => {
+    const val = (p * r * t) / 100
+    qs.push(numericMCQ(`math-4-${i + 1}`, 'Simple interest', `Find the simple interest on ₦${p} at ${r}% per annum for ${t} years.`, val, `Simple interest = (P × R × T) / 100 = (${p} × ${r} × ${t}) / 100 = ${val}.`, next()))
+  })
+
+  ;[[2, 3, 8], [5, 5, 12], [1, 2, 15], [4, 6, 9], [3, 4, 10]].forEach(([a, d, n], i) => {
+    const val = a + (n - 1) * d
+    qs.push(numericMCQ(`math-5-${i + 1}`, 'Sequences and series', `Find the ${n}th term of the arithmetic progression with first term ${a} and common difference ${d}.`, val, `Tₙ = a + (n−1)d = ${a} + (${n}−1)×${d} = ${val}.`, next()))
+  })
+
+  ;[[12, 5], [9, 6], [14, 3], [11, 7], [16, 2]].forEach(([l, w], i) => {
+    const val = l * w
+    qs.push(numericMCQ(`math-6-${i + 1}`, 'Mensuration', `Find the area of a rectangle with length ${l} cm and width ${w} cm.`, val, `Area = length × width = ${l} × ${w} = ${val} cm².`, next(), ' cm²'))
+  })
+
+  ;[[7, 1], [10, 2], [12, 4], [9, 3], [14, 2]].forEach(([s, d], i) => {
+    const x = (s + d) / 2
+    const y = (s - d) / 2
+    const val = x * y
+    qs.push(numericMCQ(`math-7-${i + 1}`, 'Simultaneous equations', `If x + y = ${s} and x − y = ${d}, find the value of xy.`, val, `Adding the equations gives x = ${x}, and y = ${y}, so xy = ${val}.`, next()))
+  })
+
+  ;[[-7, 12], [-9, 20], [-5, 6], [-11, 30], [-6, 8]].forEach(([b, c], i) => {
+    const val = -b
+    qs.push(numericMCQ(`math-8-${i + 1}`, 'Quadratic equations', `Find the sum of the roots of x² + (${b})x + ${c} = 0.`, val, `For x² + bx + c = 0, the sum of roots = −b = −(${b}) = ${val}.`, next()))
+  })
+
+  return qs
+}
+
+export const mathematicsQuestions = buildMathematicsQuestions()
+
+// ---------------------------------------------------------------------------
+// Physics — 40 questions, generated from 8 numeric templates
+// ---------------------------------------------------------------------------
+
+function buildPhysicsQuestions() {
+  const qs = []
+  let pos = 0
+  const next = () => pos++ % 4
+
+  ;[[2, 5], [3, 4], [5, 6], [4, 10], [6, 3]].forEach(([i0, r], i) => {
+    const val = i0 * r
+    qs.push(numericMCQ(`phy-1-${i + 1}`, "Ohm's law", `A current of ${i0} A flows through a resistor of ${r} Ω. Find the voltage across it.`, val, `By Ohm's law, V = IR = ${i0} × ${r} = ${val} V.`, next(), ' V'))
+  })
+
+  ;[[5, 2], [10, 3], [4, 5], [8, 4], [6, 6]].forEach(([m, a], i) => {
+    const val = m * a
+    qs.push(numericMCQ(`phy-2-${i + 1}`, "Newton's second law", `A resultant force acts on a body of mass ${m} kg, giving it an acceleration of ${a} m/s². Find the force.`, val, `F = ma = ${m} × ${a} = ${val} N.`, next(), ' N'))
+  })
+
+  ;[[50, 2], [20, 3], [80, 1], [25, 3], [12, 6]].forEach(([f, l], i) => {
+    const val = f * l
+    qs.push(numericMCQ(`phy-3-${i + 1}`, 'Waves', `A wave has a frequency of ${f} Hz and a wavelength of ${l} m. Find its speed.`, val, `Speed = frequency × wavelength = ${f} × ${l} = ${val} m/s.`, next(), ' m/s'))
+  })
+
+  ;[[20, 4], [30, 5], [24, 6], [36, 4], [45, 9]].forEach(([m, v], i) => {
+    const val = m / v
+    qs.push(numericMCQ(`phy-4-${i + 1}`, 'Density', `A substance has a mass of ${m} g and a volume of ${v} cm³. Find its density.`, val, `Density = mass/volume = ${m}/${v} = ${val} g/cm³.`, next(), ' g/cm³'))
+  })
+
+  ;[[2, 3], [4, 2], [2, 5], [5, 2], [4, 3]].forEach(([m, v], i) => {
+    const val = 0.5 * m * v * v
+    qs.push(numericMCQ(`phy-5-${i + 1}`, 'Kinetic energy', `Find the kinetic energy of a ${m} kg object moving at ${v} m/s.`, val, `KE = ½mv² = ½ × ${m} × ${v}² = ${val} J.`, next(), ' J'))
+  })
+
+  ;[[4, 6], [3, 8], [5, 10], [8, 5], [6, 11]].forEach(([r1, r2], i) => {
+    const val = r1 + r2
+    qs.push(numericMCQ(`phy-6-${i + 1}`, 'Series circuits', `Two resistors of ${r1} Ω and ${r2} Ω are connected in series. Find the total resistance.`, val, `In series, total resistance = ${r1} + ${r2} = ${val} Ω.`, next(), ' Ω'))
+  })
+
+  ;[[10, 5], [20, 3], [15, 5], [8, 6], [12, 7]].forEach(([f, d], i) => {
+    const val = f * d
+    qs.push(numericMCQ(`phy-7-${i + 1}`, 'Work done', `Find the work done when a force of ${f} N moves an object through a distance of ${d} m.`, val, `Work = force × distance = ${f} × ${d} = ${val} J.`, next(), ' J'))
+  })
+
+  ;[[100, 5], [200, 4], [150, 5], [240, 6], [90, 9]].forEach(([w, t], i) => {
+    const val = w / t
+    qs.push(numericMCQ(`phy-8-${i + 1}`, 'Power', `A machine does ${w} J of work in ${t} seconds. Find its power.`, val, `Power = work/time = ${w}/${t} = ${val} W.`, next(), ' W'))
+  })
+
+  return qs
+}
+
+export const physicsQuestions = buildPhysicsQuestions()
+
+// ---------------------------------------------------------------------------
+// Chemistry — 40 questions (30 element symbols + 10 numeric)
+// ---------------------------------------------------------------------------
+
+const elementPairs = [
+  ['Hydrogen', 'H'], ['Helium', 'He'], ['Lithium', 'Li'], ['Carbon', 'C'], ['Nitrogen', 'N'],
+  ['Oxygen', 'O'], ['Sodium', 'Na'], ['Magnesium', 'Mg'], ['Aluminium', 'Al'], ['Silicon', 'Si'],
+  ['Phosphorus', 'P'], ['Sulphur', 'S'], ['Chlorine', 'Cl'], ['Potassium', 'K'], ['Calcium', 'Ca'],
+  ['Iron', 'Fe'], ['Copper', 'Cu'], ['Zinc', 'Zn'], ['Silver', 'Ag'], ['Tin', 'Sn'],
+  ['Iodine', 'I'], ['Barium', 'Ba'], ['Gold', 'Au'], ['Mercury', 'Hg'], ['Lead', 'Pb'],
+  ['Neon', 'Ne'], ['Argon', 'Ar'], ['Bromine', 'Br'], ['Manganese', 'Mn'], ['Nickel', 'Ni'],
+]
+
+function buildChemistryQuestions() {
+  const elementQs = factBank(
+    'chem-elem',
+    'Periodic table',
+    elementPairs,
+    (t) => `What is the chemical symbol for ${t}?`,
+    (t, d) => `The chemical symbol for ${t} is ${d}.`
+  )
+
+  const numericQs = []
+  let pos = 0
+  const next = () => pos++ % 4
+
+  ;[[90, 18], [80, 40], [132, 44], [58, 58], [54, 18]].forEach(([mass, molar], i) => {
+    const val = mass / molar
+    numericQs.push(numericMCQ(`chem-num-1-${i + 1}`, 'Moles', `A sample has a mass of ${mass} g and a molar mass of ${molar} g/mol. How many moles does it contain?`, val, `Moles = mass / molar mass = ${mass}/${molar} = ${val} mol.`, next(), ' mol'))
+  })
+
+  ;[[2, 10, 4], [3, 12, 6], [4, 8, 2], [5, 10, 2], [6, 9, 3]].forEach(([p1, v1, p2], i) => {
+    const val = (p1 * v1) / p2
+    numericQs.push(numericMCQ(`chem-num-2-${i + 1}`, "Boyle's law", `A gas at ${p1} atm occupies ${v1} L. Find its volume when the pressure changes to ${p2} atm at constant temperature.`, val, `By Boyle's law, P₁V₁ = P₂V₂, so V₂ = (${p1}×${v1})/${p2} = ${val} L.`, next(), ' L'))
+  })
+
+  return [...elementQs, ...numericQs]
+}
+
+export const chemistryQuestions = buildChemistryQuestions()
+
+// ---------------------------------------------------------------------------
+// Concept-based subjects — 40 term/fact questions each
+// ---------------------------------------------------------------------------
+
+const biologyPairs = [
+  ['Cell', 'The basic structural and functional unit of life'],
+  ['Nucleus', "The organelle that controls the cell's activities and contains DNA"],
+  ['Mitochondrion', "The organelle that generates most of the cell's energy through respiration"],
+  ['Ribosome', 'The organelle where protein synthesis takes place'],
+  ['Cell membrane', 'The selectively permeable layer that encloses a cell'],
+  ['Cell wall', 'A rigid layer that provides support to plant cells'],
+  ['Chloroplast', 'The organelle where photosynthesis occurs in plants'],
+  ['Photosynthesis', 'The process by which plants make food using sunlight'],
+  ['Respiration', 'The process of releasing energy from food in cells'],
+  ['Osmosis', 'The movement of water across a membrane from high to low concentration'],
+  ['Diffusion', 'The movement of particles from a region of high to low concentration'],
+  ['Homeostasis', 'The maintenance of a stable internal environment'],
+  ['Genetics', 'The study of heredity and variation in organisms'],
+  ['Gene', 'A unit of heredity that determines a particular trait'],
+  ['Chromosome', 'A thread-like structure carrying genetic information'],
+  ['DNA', 'The molecule that carries genetic instructions in living things'],
+  ['Mitosis', 'Cell division producing two genetically identical daughter cells'],
+  ['Meiosis', 'Cell division that produces gametes with half the chromosome number'],
+  ['Ecosystem', 'A community of organisms interacting with their environment'],
+  ['Food chain', 'A sequence showing the transfer of energy between organisms'],
+  ['Food web', 'A network of interconnected food chains'],
+  ['Producer', 'An organism that makes its own food, usually via photosynthesis'],
+  ['Consumer', 'An organism that feeds on other organisms for energy'],
+  ['Decomposer', 'An organism that breaks down dead matter and returns nutrients to the soil'],
+  ['Habitat', 'The natural environment in which an organism lives'],
+  ['Adaptation', 'A feature that helps an organism survive in its environment'],
+  ['Species', 'A group of organisms that can interbreed and produce fertile offspring'],
+  ['Classification', 'The grouping of organisms based on shared characteristics'],
+  ['Vertebrate', 'An animal with a backbone'],
+  ['Invertebrate', 'An animal without a backbone'],
+  ['Enzyme', 'A protein that speeds up biochemical reactions'],
+  ['Hormone', 'A chemical messenger secreted by glands into the bloodstream'],
+  ['Nervous system', 'The system that coordinates responses using nerve impulses'],
+  ['Circulatory system', 'The system that transports blood around the body'],
+  ['Digestive system', 'The system that breaks down food for absorption'],
+  ['Respiratory system', 'The system responsible for gas exchange in the body'],
+  ['Excretion', 'The removal of metabolic waste products from the body'],
+  ['Reproduction', 'The process by which organisms produce offspring'],
+  ['Natural selection', 'The process by which better-adapted organisms survive and reproduce'],
+  ['Variation', 'Differences in characteristics among individuals of a species'],
+]
+
+const literaturePairs = [
+  ['Simile', 'A comparison between two unlike things using like or as'],
+  ['Metaphor', 'A direct comparison stating one thing is another'],
+  ['Personification', 'Giving human qualities to non-human things'],
+  ['Hyperbole', 'Deliberate exaggeration for effect'],
+  ['Alliteration', 'Repetition of initial consonant sounds'],
+  ['Assonance', 'Repetition of vowel sounds in nearby words'],
+  ['Onomatopoeia', 'A word that imitates the sound it describes'],
+  ['Irony', 'A contrast between expectation and reality'],
+  ['Oxymoron', 'A figure of speech combining contradictory terms'],
+  ['Sonnet', 'A fourteen-line poem with a fixed rhyme scheme'],
+  ['Ballad', 'A narrative poem often set to music'],
+  ['Ode', 'A poem of praise addressed to a person or thing'],
+  ['Elegy', 'A poem of mourning for the dead'],
+  ['Epic', 'A long narrative poem about heroic deeds'],
+  ['Fable', 'A short tale with animal characters teaching a moral'],
+  ['Myth', 'A traditional story explaining natural phenomena or origins'],
+  ['Legend', 'A traditional story regarded as historical but unverified'],
+  ['Parable', 'A short story that teaches a moral or spiritual lesson'],
+  ['Soliloquy', 'A speech by a character alone revealing private thoughts'],
+  ['Monologue', 'A long speech by one character to others'],
+  ['Dialogue', 'A conversation between two or more characters'],
+  ['Aside', 'A remark a character makes to the audience unheard by others'],
+  ['Protagonist', 'The main character of a story'],
+  ['Antagonist', 'The character who opposes the protagonist'],
+  ['Climax', 'The turning point or most intense moment of a story'],
+  ['Denouement', 'The resolution at the end of a story'],
+  ['Exposition', 'The introductory part that sets up a story'],
+  ['Foreshadowing', 'A hint of events to come later in a story'],
+  ['Flashback', 'A scene set earlier than the main story timeline'],
+  ['Symbolism', 'Using an object to represent a deeper meaning'],
+  ['Imagery', 'Descriptive language that appeals to the senses'],
+  ['Tone', "The author's attitude toward the subject"],
+  ['Mood', 'The emotional atmosphere created for the reader'],
+  ['Theme', 'The central message or idea of a literary work'],
+  ['Setting', 'The time and place in which a story occurs'],
+  ['Plot', 'The sequence of events in a story'],
+  ['Characterization', "The way an author reveals a character's traits"],
+  ['Satire', 'Using humour or ridicule to criticize human vices'],
+  ['Tragedy', "A serious drama ending in the downfall of the hero"],
+  ['Comedy', 'A light dramatic work that is often humorous and ends happily'],
+]
+
+const governmentPairs = [
+  ['Autocracy', 'Government where absolute power rests with one ruler'],
+  ['Democracy', 'Government by the people, directly or through representatives'],
+  ['Oligarchy', 'Government by a small group of people'],
+  ['Monarchy', 'Government headed by a king or queen'],
+  ['Theocracy', 'Government ruled according to religious law'],
+  ['Federalism', 'A system where power is shared between central and regional governments'],
+  ['Unitary state', 'A state governed as a single power with a central government'],
+  ['Confederation', 'A loose union of independent states for limited purposes'],
+  ['Bicameral legislature', 'A legislature with two chambers'],
+  ['Unicameral legislature', 'A legislature with a single chamber'],
+  ['Universal adult suffrage', 'The right of all qualified adults to vote'],
+  ['Franchise', 'The right to vote in public elections'],
+  ['Electoral college', 'A body of electors chosen to elect a candidate'],
+  ['Separation of powers', 'Dividing government into executive, legislature and judiciary'],
+  ['Checks and balances', 'A system where each arm of government limits the others'],
+  ['Rule of law', 'The principle that everyone is subject to the law'],
+  ['Fundamental human rights', 'Basic rights and freedoms guaranteed to all citizens'],
+  ['Constitution', 'The supreme law that establishes how a state is governed'],
+  ['Sovereignty', 'The supreme authority of a state to govern itself'],
+  ['Citizenship', 'Legal membership of a state with rights and duties'],
+  ['Cabinet', 'A body of senior ministers who advise the head of government'],
+  ['Bureaucracy', 'The administrative system run by appointed officials'],
+  ['Judiciary', 'The arm of government that interprets and applies the law'],
+  ['Legislature', 'The arm of government that makes laws'],
+  ['Executive', 'The arm of government that implements laws'],
+  ['Impeachment', 'A formal process to remove an official for misconduct'],
+  ['Veto', 'The power to reject a decision or proposal'],
+  ['Coalition government', 'A government formed by two or more parties'],
+  ['Pressure group', "An organised group that seeks to influence government policy"],
+  ['Political party', 'An organisation that seeks to gain and exercise political power'],
+  ['Manifesto', "A public declaration of a party's policies and aims"],
+  ['Referendum', 'A direct vote by citizens on a specific issue'],
+  ['Plebiscite', 'A vote by citizens to decide on a significant political question'],
+  ['Devolution', 'The transfer of power from central to regional government'],
+  ['Decentralisation', 'Distributing government functions away from a central authority'],
+  ['Nepotism', 'Favouritism shown to relatives in appointments'],
+  ["Coup d'état", 'The sudden, illegal seizure of power from a government'],
+  ['Martial law', 'Temporary military rule imposed during an emergency'],
+  ['Civil service', 'The body of government employees who implement policy'],
+  ['Local government', 'The lowest tier of government closest to the people'],
+]
+
+const crsPairs = [
+  ['The Ten Commandments', 'Laws given to Moses by God on Mount Sinai'],
+  ['The Exodus', 'The departure of the Israelites from slavery in Egypt'],
+  ['Genesis', 'The first book of the Bible, recording creation'],
+  ["Noah's Ark", 'The vessel Noah built to survive the great flood'],
+  ['The Tower of Babel', 'A tower built by people that God confused with many languages'],
+  ["Abraham's covenant", "God's promise to make Abraham the father of many nations"],
+  ['Joseph and his brothers', 'The story of a favoured son sold into slavery in Egypt'],
+  ['The Promised Land', 'The land of Canaan God promised to the Israelites'],
+  ['King David', 'A shepherd who became king and wrote many Psalms'],
+  ['King Solomon', "David's son known for wisdom and building the temple"],
+  ['The Prophets', "Messengers who spoke God's word to Israel"],
+  ['The Nativity', 'The birth of Jesus Christ in Bethlehem'],
+  ['John the Baptist', 'The prophet who baptised Jesus in the Jordan River'],
+  ['The Sermon on the Mount', "Jesus' teaching that includes the Beatitudes"],
+  ['The Twelve Apostles', 'The twelve men Jesus chose as his closest followers'],
+  ['The Last Supper', 'The final meal Jesus shared with his disciples before his death'],
+  ['Judas Iscariot', 'The disciple who betrayed Jesus'],
+  ['The Crucifixion', 'The execution of Jesus on the cross'],
+  ['The Resurrection', 'Jesus rising from the dead on the third day'],
+  ['The Great Commission', "Jesus' instruction to spread the gospel to all nations"],
+  ['The Good Samaritan', "A parable teaching love for one's neighbour"],
+  ['The Prodigal Son', "A parable about a father's forgiveness for a wayward son"],
+  ['The Sower', 'A parable about seeds falling on different types of soil'],
+  ['Pentecost', 'The day the Holy Spirit descended on the apostles'],
+  ["Paul's conversion", 'The transformation of Saul from persecutor to apostle'],
+  ['The Beatitudes', 'Blessings Jesus pronounced at the start of the Sermon on the Mount'],
+  ["The Lord's Prayer", 'The model prayer Jesus taught his disciples'],
+  ['Adam and Eve', 'The first man and woman created by God'],
+  ['Cain and Abel', 'The first sons of Adam and Eve, whose rivalry ended in murder'],
+  ['The Golden Rule', "Jesus' teaching to treat others as you want to be treated"],
+  ['Moses', 'The leader who received the law and led Israel out of Egypt'],
+  ['The Ark of the Covenant', 'A sacred chest containing the tablets of the law'],
+  ['The Fall of Jericho', "The city whose walls fell after Israelites marched around it"],
+  ['Samson', 'A judge of Israel known for his great strength'],
+  ['Ruth', "A Moabite woman known for her loyalty to her mother-in-law Naomi"],
+  ['Job', 'A righteous man tested by great suffering who remained faithful'],
+  ['Jonah', "A prophet who was swallowed by a great fish after fleeing God's call"],
+  ["Daniel in the lion's den", 'A story of faith protecting Daniel from harm'],
+  ['The Great Flood', "God's judgment on the earth survived by Noah's family"],
+  ['Zacchaeus', 'A tax collector whose life changed after meeting Jesus'],
+]
+
+const historyPairs = [
+  ['Pre-colonial era', "The period in Nigeria's history before European colonisation"],
+  ['Trans-Saharan trade', 'Trade routes across the Sahara linking West Africa to North Africa'],
+  ['Trans-Atlantic slave trade', 'The forced transportation of Africans to the Americas'],
+  ['Berlin Conference', 'The 1884-85 meeting where European powers partitioned Africa'],
+  ['Amalgamation of 1914', 'The merging of the Northern and Southern protectorates into Nigeria'],
+  ['Lord Lugard', "The colonial administrator who oversaw Nigeria's amalgamation"],
+  ['Indirect rule', 'A colonial policy of governing through existing local rulers'],
+  ['Sokoto Caliphate', 'An Islamic state founded by Usman dan Fodio in 1809'],
+  ['Oyo Empire', 'A powerful Yoruba empire that flourished in West Africa'],
+  ['Benin Kingdom', 'A historic kingdom known for its bronze artworks'],
+  ['Nationalism', 'A movement advocating for self-rule and independence from colonial powers'],
+  ['Herbert Macaulay', 'Regarded as the father of Nigerian nationalism'],
+  ['Nnamdi Azikiwe', "Nigeria's first President and a leading nationalist"],
+  ['Obafemi Awolowo', 'A prominent Nigerian nationalist and premier of the Western Region'],
+  ['Ahmadu Bello', 'The Premier of the Northern Region and a key independence-era leader'],
+  ['Nigerian independence', 'Nigeria gained independence from Britain on 1 October 1960'],
+  ['First Republic', "Nigeria's first period of civilian rule after independence, 1963-1966"],
+  ['Nigerian Civil War', 'The 1967-1970 conflict between Nigeria and the secessionist Biafra'],
+  ['Biafra', 'The short-lived state that seceded from Nigeria in 1967'],
+  ['Yakubu Gowon', 'The Head of State during the Nigerian Civil War'],
+  ['Military coup', 'The sudden, forceful overthrow of a government by the armed forces'],
+  ['Murtala Mohammed', 'A military head of state known for rapid reforms in 1975-76'],
+  ['Second Republic', "Nigeria's civilian government from 1979 to 1983, led by Shehu Shagari"],
+  ['Structural Adjustment Programme', 'An economic reform policy adopted by Nigeria in the 1980s'],
+  ['June 12 1993', "The date of Nigeria's annulled presidential election"],
+  ['Sani Abacha', 'A military head of state who ruled Nigeria from 1993 to 1998'],
+  ['Fourth Republic', "Nigeria's current democratic era, beginning in 1999"],
+  ['Olusegun Obasanjo', "Nigeria's president who returned the country to civilian rule in 1999"],
+  ['Federal Character Principle', 'A policy promoting balanced representation in government'],
+  ['Warrant chiefs', 'Local leaders appointed by colonial authorities to administer indirect rule'],
+  ["Aba Women's Riot", 'A 1929 protest by women against colonial taxation policies'],
+  ["Zik's Press", 'Newspapers used by Nnamdi Azikiwe to promote nationalist ideas'],
+  ['Richards Constitution', 'A 1946 constitution that divided Nigeria into three regions'],
+  ['Macpherson Constitution', 'A 1951 constitution that introduced more Nigerian participation in government'],
+  ['Lyttleton Constitution', 'A 1954 constitution that established a federal system in Nigeria'],
+  ['Willink Commission', 'A commission set up to address minority fears before independence'],
+  ['ECOWAS', 'A regional organisation promoting economic integration in West Africa'],
+  ['Pan-Africanism', 'A movement promoting unity among African peoples and nations'],
+  ['Decolonisation', 'The process by which colonies gained independence from colonial powers'],
+  ['Scramble for Africa', 'The rapid colonisation of African territory by European powers in the late 1800s'],
+]
+
+const economicsPairs = [
+  ['Scarcity', 'Limited resources relative to unlimited wants'],
+  ['Opportunity cost', 'The value of the next best alternative forgone'],
+  ['Demand', 'The quantity of a good buyers are willing to purchase at a price'],
+  ['Supply', 'The quantity of a good producers are willing to sell at a price'],
+  ['Equilibrium', 'The point where quantity demanded equals quantity supplied'],
+  ['Elasticity of demand', 'The responsiveness of quantity demanded to a price change'],
+  ['Inflation', 'A persistent rise in the general price level'],
+  ['Deflation', 'A persistent fall in the general price level'],
+  ['Gross Domestic Product', 'The total value of goods and services produced within a country'],
+  ['Gross National Product', 'GDP plus net income earned from abroad'],
+  ['Unemployment', 'The state of being without work while seeking employment'],
+  ['Factors of production', 'Land, labour, capital and entrepreneurship'],
+  ['Division of labour', 'Splitting a task into specialised parts among workers'],
+  ['Specialisation', 'Focusing on producing a limited range of goods or services'],
+  ['Monopoly', 'A market structure with a single seller controlling supply'],
+  ['Oligopoly', 'A market dominated by a few large sellers'],
+  ['Perfect competition', 'A market with many buyers and sellers of identical goods'],
+  ['Fiscal policy', 'Government use of spending and taxation to influence the economy'],
+  ['Monetary policy', 'Central bank actions to control money supply and interest rates'],
+  ['Tariff', 'A tax imposed on imported goods'],
+  ['Subsidy', 'Financial assistance given by government to reduce production costs'],
+  ['Balance of payments', "A record of a country's transactions with the rest of the world"],
+  ['Exchange rate', 'The value of one currency in terms of another'],
+  ['National income', "The total income earned by a country's citizens and businesses"],
+  ['Public finance', 'The management of government revenue and expenditure'],
+  ['Taxation', 'The compulsory collection of money by government from individuals and firms'],
+  ['Cooperative society', 'A group pooling resources for mutual economic benefit'],
+  ['Capital formation', 'The process of building up a stock of capital goods'],
+  ['Entrepreneur', 'A person who organises and takes the risk of production'],
+  ['Utility', 'The satisfaction derived from consuming a good or service'],
+  ['Law of diminishing returns', 'Adding more of one input eventually yields smaller output gains'],
+  ['Mixed economy', 'An economy combining private enterprise and government control'],
+  ['Capitalism', 'An economic system based on private ownership and free markets'],
+  ['Socialism', 'An economic system where the state controls production and distribution'],
+  ['Privatisation', 'Transferring ownership from government to private hands'],
+  ['Nationalisation', 'Transferring ownership from private hands to government'],
+  ['Currency', 'Money in circulation used as a medium of exchange'],
+  ['Barter', 'The direct exchange of goods and services without money'],
+  ['Liquidity', 'The ease with which an asset can be converted into cash'],
+  ['Per capita income', 'Average income per person in a country'],
+]
+
+const commercePairs = [
+  ['Commerce', 'All activities involved in the exchange and distribution of goods'],
+  ['Trade', 'The buying and selling of goods and services'],
+  ['Home trade', 'Trade carried out within the boundaries of one country'],
+  ['Foreign trade', 'Trade between different countries'],
+  ['Entrepot trade', 'Importing goods for re-export to another country'],
+  ['Retailer', 'A trader who sells goods in small quantities to final consumers'],
+  ['Wholesaler', 'A trader who buys in bulk and sells to retailers'],
+  ['Insurance', 'A contract providing compensation for specified losses in return for premium'],
+  ['Warehousing', 'The storage of goods until they are needed'],
+  ['Bill of lading', 'A document evidencing receipt of goods for shipment'],
+  ['Cheque', 'A written order instructing a bank to pay a stated sum'],
+  ['Promissory note', 'A written promise to pay a specified sum on demand or at a future date'],
+  ['Stock exchange', 'A market where shares of public companies are traded'],
+  ['Partnership', 'A business owned by two or more people sharing profits and losses'],
+  ['Sole proprietorship', 'A business owned and run by one person'],
+  ['Joint stock company', "A company whose capital is divided into transferable shares"],
+  ['Franchise', "A licence allowing a business to trade under another's brand"],
+  ['Invoice', 'A document listing goods sold and the amount owed'],
+  ['Receipt', 'A document acknowledging that payment has been made'],
+  ['Indemnity', 'A guarantee to compensate for loss or damage'],
+  ['Premium', 'The amount paid periodically for an insurance policy'],
+  ['Underwriter', 'A person or company that assesses and accepts insurance risk'],
+  ['Freight', 'The cost of transporting goods'],
+  ['Courier', 'A service that delivers documents or parcels quickly'],
+  ['E-commerce', 'Buying and selling goods and services over the internet'],
+  ['Advertising', 'Communication intended to promote the sale of goods or services'],
+  ['Branding', 'Creating a distinct identity for a product or company'],
+  ['Packaging', 'Wrapping or containing goods for protection and sale'],
+  ['Distribution channel', 'The path goods take from producer to consumer'],
+  ['Import', 'Goods brought into a country from abroad'],
+  ['Export', 'Goods sent out of a country to be sold abroad'],
+  ['Quota', 'A limit on the quantity of goods that can be imported'],
+  ['Bank overdraft', 'Permission to withdraw more money than is in an account'],
+  ['Mortgage', 'A loan secured against property'],
+  ['Lease', 'A contract granting use of an asset for a period in return for payment'],
+  ['Hire purchase', 'Buying goods by paying in instalments while using them'],
+  ['Consignment', 'Goods sent by a supplier to an agent for sale'],
+  ['Middleman', 'A person who links producers and consumers in the distribution chain'],
+  ['Chamber of commerce', 'An organisation that promotes the interests of business'],
+  ['Currency exchange', "Converting one country's money into another's"],
+]
+
+const accountsPairs = [
+  ['Bookkeeping', 'The recording of financial transactions of a business'],
+  ['Double-entry', 'Recording each transaction as both a debit and a credit'],
+  ['Debit', 'An entry recording an increase in assets or expenses'],
+  ['Credit', 'An entry recording an increase in liabilities, income or capital'],
+  ['Ledger', 'A book containing accounts where transactions are posted'],
+  ['Journal', 'A book of original entry recording transactions in order'],
+  ['Trial balance', 'A list of ledger balances used to check accounting accuracy'],
+  ['Balance sheet', 'A statement showing assets, liabilities and capital at a point in time'],
+  ['Profit and loss account', 'A statement showing income and expenses over a period'],
+  ['Assets', 'Resources owned by a business with economic value'],
+  ['Liabilities', 'Amounts owed by a business to others'],
+  ['Capital', "The owner's investment in a business"],
+  ['Depreciation', 'The reduction in value of an asset over time'],
+  ['Straight-line depreciation', "A method spreading depreciation evenly over an asset's life"],
+  ['Reducing balance method', 'A depreciation method applying a fixed rate to the remaining value'],
+  ['Accrual', 'Income earned or expense incurred but not yet recorded in cash'],
+  ['Prepayment', 'Payment made in advance for goods or services not yet received'],
+  ['Bad debt', 'A debt that is unlikely to be recovered'],
+  ['Provision for doubtful debts', 'An estimated amount set aside for debts that may not be paid'],
+  ['Trading account', 'A statement showing gross profit from buying and selling goods'],
+  ['Gross profit', 'Revenue from sales minus the cost of goods sold'],
+  ['Net profit', 'Gross profit minus operating expenses'],
+  ['Capital expenditure', 'Spending on acquiring or improving long-term assets'],
+  ['Revenue expenditure', 'Spending on the day-to-day running of a business'],
+  ['Cash book', 'A book recording all cash and bank transactions'],
+  ['Petty cash', 'A small amount of cash kept for minor expenses'],
+  ['Bank reconciliation', 'Comparing a cash book with a bank statement to explain differences'],
+  ['Suspense account', 'A temporary account used when a trial balance does not balance'],
+  ['Working capital', 'The excess of current assets over current liabilities'],
+  ['Current assets', 'Assets expected to be converted to cash within a year'],
+  ['Current liabilities', 'Debts due to be paid within a year'],
+  ['Fixed assets', 'Long-term assets used in running a business'],
+  ['Drawings', 'Cash or goods withdrawn by the owner for personal use'],
+  ['Accounting equation', 'Assets equal liabilities plus capital'],
+  ['Source document', 'Original evidence of a business transaction, such as an invoice'],
+  ['Control account', 'A summary account that checks the accuracy of subsidiary ledgers'],
+  ['Manufacturing account', 'A statement showing the total cost of goods produced'],
+  ['Partnership deed', 'A written agreement setting out the terms of a partnership'],
+  ['Goodwill', "The value of a business's reputation above its net assets"],
+  ['Final accounts', 'The trading account, profit and loss account and balance sheet together'],
+]
+
+export const biologyQuestions = factBank('bio', 'Biology', biologyPairs, describePrompt, describeExplanation)
+export const literatureQuestions = factBank('lit', 'Literary terms', literaturePairs, describePrompt, describeExplanation)
+export const governmentQuestions = factBank('gov', 'Government', governmentPairs, describePrompt, describeExplanation)
+export const crsQuestions = factBank('crs', 'Christian Religious Studies', crsPairs, describePrompt, describeExplanation)
+export const historyQuestions = factBank('hist', 'History', historyPairs, describePrompt, describeExplanation)
+export const economicsQuestions = factBank('eco', 'Economics', economicsPairs, describePrompt, describeExplanation)
+export const commerceQuestions = factBank('com', 'Commerce', commercePairs, describePrompt, describeExplanation)
+export const accountsQuestions = factBank('acc', 'Financial Accounting', accountsPairs, describePrompt, describeExplanation)
+
+// ---------------------------------------------------------------------------
+// Combined question bank
+// ---------------------------------------------------------------------------
+
+export const questionBank = {
+  english: englishQuestions,
+  mathematics: mathematicsQuestions,
+  physics: physicsQuestions,
+  chemistry: chemistryQuestions,
+  biology: biologyQuestions,
+  literature: literatureQuestions,
+  government: governmentQuestions,
+  crs: crsQuestions,
+  history: historyQuestions,
+  economics: economicsQuestions,
+  commerce: commerceQuestions,
+  accounts: accountsQuestions,
+}
+
+// Returns exactly `count` questions for a subject, cycling the bank if it
+// happens to be shorter than the requested count.
+export function pickQuestions(subjectId, count) {
+  const bank = questionBank[subjectId] || []
+  if (bank.length === 0) return []
+  if (bank.length >= count) return bank.slice(0, count)
+  return Array.from({ length: count }, (_, i) => bank[i % bank.length])
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard / progress display data
 // ---------------------------------------------------------------------------
 
 export const weeklyActivity = [
@@ -691,20 +732,21 @@ export const subjectPerformance = [
 
 export const weakTopics = [
   { topic: 'Number bases', subject: 'mathematics', accuracy: 52, questions: 8 },
-  { topic: 'Current electricity', subject: 'physics', accuracy: 58, questions: 8 },
-  { topic: 'Chemical bonding', subject: 'chemistry', accuracy: 61, questions: 8 },
+  { topic: 'Series circuits', subject: 'physics', accuracy: 58, questions: 8 },
+  { topic: 'Periodic table', subject: 'chemistry', accuracy: 61, questions: 8 },
 ]
 
 export const pastPapers = [
-  { id: 'jamb-math-2024', title: 'JAMB Mathematics — 2024', subject: 'mathematics', meta: '8 questions · Number bases, algebra, mensuration' },
-  { id: 'jamb-eng-2023', title: 'JAMB Use of English — 2023', subject: 'english', meta: '8 questions · Vocabulary, grammar, comprehension' },
-  { id: 'jamb-phy-2022', title: 'JAMB Physics — 2022', subject: 'physics', meta: '8 questions · Mechanics, electricity, waves' },
+  { id: 'jamb-math-2024', title: 'JAMB Mathematics — 2024', subject: 'mathematics', meta: 'Number bases, algebra, mensuration' },
+  { id: 'jamb-eng-2023', title: 'JAMB Use of English — 2023', subject: 'english', meta: 'Vocabulary, grammar, idioms' },
+  { id: 'jamb-phy-2022', title: 'JAMB Physics — 2022', subject: 'physics', meta: 'Mechanics, electricity, waves' },
 ]
 
-export const mockExams = [
-  { id: 'science-full-mock', streamId: 'science', title: 'Science Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
-  { id: 'arts-full-mock', streamId: 'arts', title: 'Arts Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
-  { id: 'commercial-full-mock', streamId: 'commercial', title: 'Commercial Full Mock — 4 Subjects', duration: 120, questions: 32, difficulty: 'Exam standard' },
-  { id: 'jamb-math-mock', streamId: 'science', subjectId: 'mathematics', title: 'JAMB Mathematics Timed Mock', duration: 40, questions: 8, difficulty: 'Intermediate' },
-  { id: 'jamb-eng-mock', streamId: 'arts', subjectId: 'english', title: 'JAMB Use of English Timed Mock', duration: 40, questions: 8, difficulty: 'Intermediate' },
-]
+// One full 4-subject combo per stream (compulsory + first N electives),
+// used for the "quick start" full mock on the Mock Exams page.
+export const mockExams = streams.map((stream) => ({
+  id: `${stream.id}-full-mock`,
+  streamId: stream.id,
+  title: `${stream.name} Full Mock`,
+  subjects: [...stream.compulsory, ...stream.electivePool.slice(0, stream.electiveCount)],
+}))
