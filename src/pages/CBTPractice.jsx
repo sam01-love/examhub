@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   Clock,
@@ -9,8 +9,11 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react'
-import { pickQuestions, subjectMeta, subjectQuestionCount } from '../data/mockData'
+import { fetchQuestions, subjectMeta, subjectQuestionCount } from '../data/mockData'
+import { supabase } from '../lib/supabaseClient'
+import { useAuth } from '../context/AuthContext'
 
 const EXAM_SECONDS = 2 * 60 * 60 // 2 hours, fixed regardless of subject count
 
@@ -23,25 +26,77 @@ function formatClock(totalSeconds) {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`
 }
 
+function LoadingState({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
+      <Loader2 className="animate-spin text-primary" size={28} />
+      <p className="text-sm font-medium">{label}</p>
+    </div>
+  )
+}
+
 export default function CBTPractice() {
   const [params] = useSearchParams()
   const mode = params.get('mode') || 'study'
 
   if (mode === 'exam') {
     const subjectIds = (params.get('subjects') || '').split(',').filter(Boolean)
-    return <ExamSession subjectIds={subjectIds} />
+    const streamId = params.get('stream') || 'unknown'
+    return <ExamLoader key={subjectIds.join(',')} subjectIds={subjectIds} streamId={streamId} />
   }
 
   const subjectId = params.get('subject') || 'mathematics'
-  return <StudySession subjectId={subjectId} />
+  return <StudyLoader key={subjectId} subjectId={subjectId} />
+}
+
+// Loaders fetch questions (admin-added ones from Supabase, else the built-in
+// bank) and only mount the session once they are ready.
+function StudyLoader({ subjectId }) {
+  const [questions, setQuestions] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    fetchQuestions(subjectId, subjectQuestionCount(subjectId)).then((qs) => {
+      if (active) setQuestions(qs)
+    })
+    return () => {
+      active = false
+    }
+  }, [subjectId])
+
+  if (!questions) return <LoadingState label="Loading questions…" />
+  return <StudySession subjectId={subjectId} questions={questions} />
+}
+
+function ExamLoader({ subjectIds, streamId }) {
+  const [subjects, setSubjects] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    Promise.all(
+      subjectIds.map(async (id) => ({
+        id,
+        name: subjectMeta[id]?.name || id,
+        questions: await fetchQuestions(id, subjectQuestionCount(id)),
+      }))
+    ).then((result) => {
+      if (active) setSubjects(result)
+    })
+    return () => {
+      active = false
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectIds.join(',')])
+
+  if (!subjects) return <LoadingState label="Preparing your exam…" />
+  return <ExamSession subjects={subjects} streamId={streamId} />
 }
 
 // ---------------------------------------------------------------------------
 // Study Mode — one subject, untimed, immediate explanation on answering
 // ---------------------------------------------------------------------------
 
-function StudySession({ subjectId }) {
-  const questions = useMemo(() => pickQuestions(subjectId, subjectQuestionCount(subjectId)), [subjectId])
+function StudySession({ subjectId, questions }) {
   const subjectName = subjectMeta[subjectId]?.name || subjectId
 
   const [index, setIndex] = useState(0)
@@ -197,17 +252,7 @@ function StudySession({ subjectId }) {
 // Exam Mode — full 4-subject combo, 2-hour timer, /400 grading, optional review
 // ---------------------------------------------------------------------------
 
-function ExamSession({ subjectIds }) {
-  const subjects = useMemo(
-    () =>
-      subjectIds.map((id) => ({
-        id,
-        name: subjectMeta[id]?.name || id,
-        questions: pickQuestions(id, subjectQuestionCount(id)),
-      })),
-    [subjectIds]
-  )
-
+function ExamSession({ subjects, streamId }) {
   const [activeSubject, setActiveSubject] = useState(0)
   const [indexBySubject, setIndexBySubject] = useState(() => subjects.map(() => 0))
   const [answers, setAnswers] = useState(() => subjects.map((s) => Array(s.questions.length).fill(null)))
@@ -252,7 +297,7 @@ function ExamSession({ subjectIds }) {
   const totalQuestions = subjects.reduce((sum, s) => sum + s.questions.length, 0)
 
   if (finished) {
-    return <ExamResult subjects={subjects} answers={answers} timeLeft={timeLeft} />
+    return <ExamResult subjects={subjects} answers={answers} streamId={streamId} />
   }
 
   return (
@@ -386,16 +431,41 @@ function ExamSession({ subjectIds }) {
   )
 }
 
-function ExamResult({ subjects, answers }) {
+function ExamResult({ subjects, answers, streamId }) {
+  const { user } = useAuth()
   const [expanded, setExpanded] = useState({})
   const [revealAll, setRevealAll] = useState(false)
+  const savedRef = useRef(false)
 
-  const breakdown = subjects.map((s, i) => {
-    const correct = s.questions.filter((q, qi) => answers[i][qi] === q.answer).length
-    const score100 = Math.round((correct / s.questions.length) * 100)
-    return { ...s, correct, score100 }
-  })
-  const total400 = breakdown.reduce((sum, b) => sum + b.score100, 0)
+  const { breakdown, total400 } = useMemo(() => {
+    const rows = subjects.map((s, i) => {
+      const correct = s.questions.filter((q, qi) => answers[i][qi] === q.answer).length
+      const score100 = Math.round((correct / s.questions.length) * 100)
+      return { ...s, correct, score100 }
+    })
+    return { breakdown: rows, total400: rows.reduce((sum, b) => sum + b.score100, 0) }
+  }, [subjects, answers])
+
+  // Save this attempt once so admins can track group effectiveness.
+  // Best-effort: a failure (e.g. table not created yet) never affects the student.
+  useEffect(() => {
+    if (savedRef.current || !user) return
+    savedRef.current = true
+    const subjectScores = Object.fromEntries(breakdown.map((b) => [b.id, b.score100]))
+    supabase
+      .from('exam_attempts')
+      .insert({
+        user_id: user.id,
+        user_email: user.email,
+        stream: streamId,
+        subjects: breakdown.map((b) => b.id),
+        subject_scores: subjectScores,
+        total_score: total400,
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[EXAMHUB] Could not save exam attempt:', error.message)
+      })
+  }, [user, breakdown, total400, streamId])
 
   const toggle = (key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
 

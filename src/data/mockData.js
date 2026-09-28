@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabaseClient'
+
 // ---------------------------------------------------------------------------
 // JAMB subject combination rules
 // ---------------------------------------------------------------------------
@@ -707,6 +709,27 @@ export function pickQuestions(subjectId, count) {
   if (bank.length === 0) return []
   if (bank.length >= count) return bank.slice(0, count)
   return Array.from({ length: count }, (_, i) => bank[i % bank.length])
+}
+
+// Loads questions for a subject. If the admin has added questions for it in
+// Supabase (`questions` table) those are served; otherwise (no rows, table
+// missing, offline) it falls back to the built-in bank above.
+export async function fetchQuestions(subjectId, count) {
+  try {
+    const { data, error } = await supabase
+      .from('questions')
+      .select('id,instruction,prompt,options,answer,explanation')
+      .eq('subject', subjectId)
+      .limit(500)
+    if (error || !data || data.length === 0) return pickQuestions(subjectId, count)
+
+    // Shuffle so repeat attempts differ, then trim (or cycle) to the target count.
+    const shuffled = [...data].sort(() => Math.random() - 0.5)
+    if (shuffled.length >= count) return shuffled.slice(0, count)
+    return Array.from({ length: count }, (_, i) => shuffled[i % shuffled.length])
+  } catch {
+    return pickQuestions(subjectId, count)
+  }
 }
 
 // ---------------------------------------------------------------------------
