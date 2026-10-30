@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Play,
@@ -11,19 +12,26 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { weeklyActivity, weakTopics, streams, subjectMeta } from '../data/mockData'
+import { streams, subjectMeta } from '../data/mockData'
+import { fetchPerformanceSummary } from '../lib/attemptsApi'
 
 const streamIcons = { FlaskConical, Landmark, Briefcase }
 
-const stats = [
-  { icon: Layers, value: '1,248', label: 'Practiced' },
-  { icon: Percent, value: '78%', label: 'Accuracy' },
-  { icon: Flame, value: '12', label: 'Day streak' },
-  { icon: Target, value: '300+', label: 'Target' },
+const FALLBACK_WEEKLY = [
+  { day: 'Mon', value: 0 },
+  { day: 'Tue', value: 0 },
+  { day: 'Wed', value: 0 },
+  { day: 'Thu', value: 0 },
+  { day: 'Fri', value: 0 },
+  { day: 'Sat', value: 0 },
+  { day: 'Sun', value: 0 },
 ]
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
+
   const firstName = (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there').split(' ')[0]
   const initials = (user?.user_metadata?.full_name || user?.email || 'TO')
     .split(' ')
@@ -31,8 +39,35 @@ export default function Dashboard() {
     .join('')
     .slice(0, 2)
     .toUpperCase()
-  const maxActivity = Math.max(...weeklyActivity.map((d) => d.value))
-  const weakest = weakTopics[0]
+
+  useEffect(() => {
+    let active = true
+    if (!user?.id) return
+    setLoading(true)
+    fetchPerformanceSummary(user.id).then((result) => {
+      if (active) {
+        setSummary(result)
+        setLoading(false)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  const practiced = summary?.practiced ?? 0
+  const accuracy = summary?.accuracy ?? 0
+  const streak = summary?.streak ?? 0
+  const weeklyActivity = summary?.weeklyActivity ?? FALLBACK_WEEKLY
+  const weakest = summary?.weakTopics?.[0]
+  const maxActivity = Math.max(1, ...weeklyActivity.map((d) => d.value))
+
+  const stats = [
+    { icon: Layers, value: practiced.toLocaleString(), label: 'Practiced' },
+    { icon: Percent, value: `${accuracy}%`, label: 'Accuracy' },
+    { icon: Flame, value: String(streak), label: 'Day streak' },
+    { icon: Target, value: '300+', label: 'Target' },
+  ]
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6 sm:max-w-2xl lg:max-w-5xl">
@@ -68,7 +103,7 @@ export default function Dashboard() {
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-primary">
               <Icon size={17} />
             </span>
-            <p className="mt-2 font-heading text-base font-bold sm:text-lg">{value}</p>
+            <p className="mt-2 font-heading text-base font-bold sm:text-lg">{loading ? '—' : value}</p>
             <p className="text-[10px] text-muted-foreground sm:text-xs">{label}</p>
           </div>
         ))}
@@ -109,19 +144,37 @@ export default function Dashboard() {
       </div>
 
       {/* Focus area — single icon tile, links to Performance for detail */}
-      <Link
-        to="/performance"
-        className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-theme"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-          <Target size={20} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold">{subjectMeta[weakest.subject]?.short}: {weakest.topic}</p>
-          <p className="text-xs text-muted-foreground">{weakest.accuracy}% accuracy</p>
-        </div>
-        <ArrowRight size={18} className="shrink-0 text-muted-foreground" />
-      </Link>
+      {weakest ? (
+        <Link
+          to="/performance"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-theme"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+            <Target size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold">
+              {subjectMeta[weakest.subject]?.short}: {weakest.topic}
+            </p>
+            <p className="text-xs text-muted-foreground">{weakest.accuracy}% accuracy</p>
+          </div>
+          <ArrowRight size={18} className="shrink-0 text-muted-foreground" />
+        </Link>
+      ) : (
+        <Link
+          to="/practice"
+          className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-theme"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-secondary text-primary">
+            <Target size={20} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold">No weak topics yet</p>
+            <p className="text-xs text-muted-foreground">Answer a few more questions to see where to focus.</p>
+          </div>
+          <ArrowRight size={18} className="shrink-0 text-muted-foreground" />
+        </Link>
+      )}
     </div>
   )
 }

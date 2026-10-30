@@ -73,10 +73,10 @@ export default function Landing() {
           </span>
           <div className="flex items-center gap-5 text-white/80">
             <span className="flex items-center gap-1.5">
-              <Mail size={13} /> hello@examhub.ng
+              <Mail size={13} /> Abefeolaidetv@gmail.com
             </span>
             <span className="flex items-center gap-1.5">
-              <Phone size={13} /> +234 800 000 0000
+              <Phone size={13} /> +234 706 824 6503
             </span>
           </div>
         </div>

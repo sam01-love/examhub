@@ -42,10 +42,10 @@ export default function Settings() {
           </div>
           <div className="flex items-center gap-3 rounded-lg border border-border p-4">
             <ShieldCheck size={18} className="text-muted-foreground" />
-            <div>
-              <p className="text-xs text-muted-foreground">Account secured by</p>
-              <p className="text-sm font-semibold">Supabase Auth</p>
-            </div>
+            {<div>
+              <p className="text-xs text-muted-foreground">Password</p>
+              <p className="text-sm font-semibold">********</p>
+            </div>}
           </div>
         </div>
       </section>

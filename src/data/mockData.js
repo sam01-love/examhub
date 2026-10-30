@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabaseClient'
 
 export const subjectMeta = {
   english: { name: 'Use of English', short: 'English', color: 'blue' },
+  aptitude_test: { name: 'Aptitude Test', short: 'Aptitude', color: 'violet' },
   mathematics: { name: 'Mathematics', short: 'Maths', color: 'indigo' },
   physics: { name: 'Physics', short: 'Physics', color: 'sky' },
   chemistry: { name: 'Chemistry', short: 'Chemistry', color: 'green' },
@@ -26,6 +27,8 @@ export const subjectMeta = {
   economics: { name: 'Economics', short: 'Economics', color: 'teal' },
   commerce: { name: 'Commerce', short: 'Commerce', color: 'orange' },
   accounts: { name: 'Financial Accounting', short: 'Accounts', color: 'cyan' },
+  chm101: { name: 'CHM 101 — General Chemistry I', short: 'CHM 101', color: 'slate' },
+  chm102: { name: 'CHM 102 — General Chemistry II', short: 'CHM 102', color: 'slate' },
 }
 
 export const streams = [
@@ -58,10 +61,65 @@ export const streams = [
   },
 ]
 
-export const targetScores = ['180+', '200+', '250+', '300+', '350+']
+// ---------------------------------------------------------------------------
+// Post UTME subject combination rules
+// ---------------------------------------------------------------------------
+// OAU's own Post UTME screening test replaces the JAMB "Use of English" paper
+// with a single general Aptitude Test (verbal reasoning, quantitative
+// reasoning, and general knowledge) that every candidate sits regardless of
+// field of study. Everything else about the combination (field-specific
+// electives) stays the same as JAMB, so this is just `streams` with
+// "english" swapped for "aptitude_test" in each field's compulsory list.
+// ---------------------------------------------------------------------------
 
-// JAMB question-count standard: 60 for Use of English, 40 for every other subject
-export function subjectQuestionCount(subjectId) {
+export const postUtmeStreams = streams.map((stream) => ({
+  ...stream,
+  compulsory: stream.compulsory.map((id) => (id === 'english' ? 'aptitude_test' : id)),
+}))
+
+export const targetScores = ['180+', '200+', '250+', '300+', '350+']
+// ---------------------------------------------------------------------------
+// Exam types — JAMB / Post UTME / OAU Courses
+// ---------------------------------------------------------------------------
+// JAMB and Post UTME both use the same "field of study -> 4 subject combo"
+// shape, so they both read from a `streams`-shaped array — JAMB from
+// `streams`, Post UTME from `postUtmeStreams` (Aptitude Test instead of
+// Use of English). OAU Courses is different: it only offers the Science
+// field of study, and instead of a subject combo the student picks one
+// specific course code to practice (e.g. CHM 101).
+
+export const examTypes = [
+  { id: 'jamb', name: 'JAMB', blurb: 'UTME — 4 subjects, English compulsory' },
+  { id: 'post_utme', name: 'Post UTME', blurb: "OAU's own screening test — Aptitude Test + electives" },
+  { id: 'oau', name: 'OAU Courses', blurb: 'Practice by specific course code' },
+]
+
+// Field-of-study options per exam type. OAU Courses only offers Science.
+export const oauFieldsOfStudy = [
+  { id: 'science', name: 'Science', tagline: 'OAU 100-level science courses', icon: 'FlaskConical' },
+]
+
+export const fieldsOfStudyByExamType = {
+  jamb: streams,
+  post_utme: postUtmeStreams,
+  oau: oauFieldsOfStudy,
+}
+
+// OAU courses, grouped by field of study. Add more here as they're ready —
+// nothing else needs to change for a new course to show up in the picker.
+export const oauCourses = [
+  { id: 'chm101', code: 'CHM 101', title: 'General Chemistry I', fieldOfStudy: 'science' },
+  { id: 'chm102', code: 'CHM 102', title: 'General Chemistry II', fieldOfStudy: 'science' },
+]
+
+export function oauCoursesFor(fieldOfStudyId) {
+  return oauCourses.filter((c) => c.fieldOfStudy === fieldOfStudyId)
+}
+// Question counts per sitting. JAMB: 60 for Use of English, 40 for every
+// other subject. Post UTME: 10 per subject (including the Aptitude Test,
+// which is drawn at random from its larger 50-question bank).
+export function subjectQuestionCount(subjectId, examType = 'jamb') {
+  if (examType === 'post_utme') return 10
   return subjectId === 'english' ? 60 : 40
 }
 
@@ -107,6 +165,26 @@ function factBank(prefix, instruction, pairs, promptFn, explanationFn) {
       options,
       answer: position,
       explanation: explanationFn(term, def),
+    }
+  })
+}
+
+// Like factBank, but for direct [question, answer] pairs (no "Which of the
+// following best describes..." wrapper) — used for the Aptitude Test's
+// general knowledge section.
+function qaBank(prefix, instruction, pairs) {
+  return pairs.map(([question, answer], i) => {
+    const distractors = [1, 2, 3].map((o) => pairs[(i + o) % pairs.length][1])
+    const position = i % 4
+    const options = [...distractors]
+    options.splice(position, 0, answer)
+    return {
+      id: `${prefix}-${i + 1}`,
+      instruction,
+      prompt: question,
+      options,
+      answer: position,
+      explanation: `${answer} is correct.`,
     }
   })
 }
@@ -183,48 +261,48 @@ function buildMathematicsQuestions() {
   let pos = 0
   const next = () => pos++ % 4
 
-  ;['1011', '10110', '11001', '101101', '111010'].forEach((bin, i) => {
-    const val = parseInt(bin, 2)
-    qs.push(numericMCQ(`math-1-${i + 1}`, 'Number bases', `Convert ${bin}₂ to base 10.`, val, `${bin}₂ = ${val} in base 10, found by summing the place values of each 1-bit.`, next()))
-  })
+    ;['1011', '10110', '11001', '101101', '111010'].forEach((bin, i) => {
+      const val = parseInt(bin, 2)
+      qs.push(numericMCQ(`math-1-${i + 1}`, 'Number bases', `Convert ${bin}₂ to base 10.`, val, `${bin}₂ = ${val} in base 10, found by summing the place values of each 1-bit.`, next()))
+    })
 
-  ;[[3, 4, 5], [2, 5, 4], [4, 3, 2], [5, 2, 1], [3, 3, 2]].forEach(([a, b, c], i) => {
-    const exp = a + b - c
-    const val = Math.pow(2, exp)
-    qs.push(numericMCQ(`math-2-${i + 1}`, 'Indices', `Simplify: (2^${a} × 2^${b}) ÷ 2^${c}`, val, `2^${a} × 2^${b} ÷ 2^${c} = 2^(${a}+${b}-${c}) = 2^${exp} = ${val}.`, next()))
-  })
+    ;[[3, 4, 5], [2, 5, 4], [4, 3, 2], [5, 2, 1], [3, 3, 2]].forEach(([a, b, c], i) => {
+      const exp = a + b - c
+      const val = Math.pow(2, exp)
+      qs.push(numericMCQ(`math-2-${i + 1}`, 'Indices', `Simplify: (2^${a} × 2^${b}) ÷ 2^${c}`, val, `2^${a} × 2^${b} ÷ 2^${c} = 2^(${a}+${b}-${c}) = 2^${exp} = ${val}.`, next()))
+    })
 
-  ;[[15, 200], [20, 180], [25, 80], [10, 250], [30, 90]].forEach(([p, n], i) => {
-    const val = (p / 100) * n
-    qs.push(numericMCQ(`math-3-${i + 1}`, 'Percentages', `What is ${p}% of ${n}?`, val, `${p}% of ${n} = (${p}/100) × ${n} = ${val}.`, next()))
-  })
+    ;[[15, 200], [20, 180], [25, 80], [10, 250], [30, 90]].forEach(([p, n], i) => {
+      const val = (p / 100) * n
+      qs.push(numericMCQ(`math-3-${i + 1}`, 'Percentages', `What is ${p}% of ${n}?`, val, `${p}% of ${n} = (${p}/100) × ${n} = ${val}.`, next()))
+    })
 
-  ;[[1000, 5, 2], [2000, 4, 3], [1500, 6, 2], [5000, 2, 3], [2500, 8, 1]].forEach(([p, r, t], i) => {
-    const val = (p * r * t) / 100
-    qs.push(numericMCQ(`math-4-${i + 1}`, 'Simple interest', `Find the simple interest on ₦${p} at ${r}% per annum for ${t} years.`, val, `Simple interest = (P × R × T) / 100 = (${p} × ${r} × ${t}) / 100 = ${val}.`, next()))
-  })
+    ;[[1000, 5, 2], [2000, 4, 3], [1500, 6, 2], [5000, 2, 3], [2500, 8, 1]].forEach(([p, r, t], i) => {
+      const val = (p * r * t) / 100
+      qs.push(numericMCQ(`math-4-${i + 1}`, 'Simple interest', `Find the simple interest on ₦${p} at ${r}% per annum for ${t} years.`, val, `Simple interest = (P × R × T) / 100 = (${p} × ${r} × ${t}) / 100 = ${val}.`, next()))
+    })
 
-  ;[[2, 3, 8], [5, 5, 12], [1, 2, 15], [4, 6, 9], [3, 4, 10]].forEach(([a, d, n], i) => {
-    const val = a + (n - 1) * d
-    qs.push(numericMCQ(`math-5-${i + 1}`, 'Sequences and series', `Find the ${n}th term of the arithmetic progression with first term ${a} and common difference ${d}.`, val, `Tₙ = a + (n−1)d = ${a} + (${n}−1)×${d} = ${val}.`, next()))
-  })
+    ;[[2, 3, 8], [5, 5, 12], [1, 2, 15], [4, 6, 9], [3, 4, 10]].forEach(([a, d, n], i) => {
+      const val = a + (n - 1) * d
+      qs.push(numericMCQ(`math-5-${i + 1}`, 'Sequences and series', `Find the ${n}th term of the arithmetic progression with first term ${a} and common difference ${d}.`, val, `Tₙ = a + (n−1)d = ${a} + (${n}−1)×${d} = ${val}.`, next()))
+    })
 
-  ;[[12, 5], [9, 6], [14, 3], [11, 7], [16, 2]].forEach(([l, w], i) => {
-    const val = l * w
-    qs.push(numericMCQ(`math-6-${i + 1}`, 'Mensuration', `Find the area of a rectangle with length ${l} cm and width ${w} cm.`, val, `Area = length × width = ${l} × ${w} = ${val} cm².`, next(), ' cm²'))
-  })
+    ;[[12, 5], [9, 6], [14, 3], [11, 7], [16, 2]].forEach(([l, w], i) => {
+      const val = l * w
+      qs.push(numericMCQ(`math-6-${i + 1}`, 'Mensuration', `Find the area of a rectangle with length ${l} cm and width ${w} cm.`, val, `Area = length × width = ${l} × ${w} = ${val} cm².`, next(), ' cm²'))
+    })
 
-  ;[[7, 1], [10, 2], [12, 4], [9, 3], [14, 2]].forEach(([s, d], i) => {
-    const x = (s + d) / 2
-    const y = (s - d) / 2
-    const val = x * y
-    qs.push(numericMCQ(`math-7-${i + 1}`, 'Simultaneous equations', `If x + y = ${s} and x − y = ${d}, find the value of xy.`, val, `Adding the equations gives x = ${x}, and y = ${y}, so xy = ${val}.`, next()))
-  })
+    ;[[7, 1], [10, 2], [12, 4], [9, 3], [14, 2]].forEach(([s, d], i) => {
+      const x = (s + d) / 2
+      const y = (s - d) / 2
+      const val = x * y
+      qs.push(numericMCQ(`math-7-${i + 1}`, 'Simultaneous equations', `If x + y = ${s} and x − y = ${d}, find the value of xy.`, val, `Adding the equations gives x = ${x}, and y = ${y}, so xy = ${val}.`, next()))
+    })
 
-  ;[[-7, 12], [-9, 20], [-5, 6], [-11, 30], [-6, 8]].forEach(([b, c], i) => {
-    const val = -b
-    qs.push(numericMCQ(`math-8-${i + 1}`, 'Quadratic equations', `Find the sum of the roots of x² + (${b})x + ${c} = 0.`, val, `For x² + bx + c = 0, the sum of roots = −b = −(${b}) = ${val}.`, next()))
-  })
+    ;[[-7, 12], [-9, 20], [-5, 6], [-11, 30], [-6, 8]].forEach(([b, c], i) => {
+      const val = -b
+      qs.push(numericMCQ(`math-8-${i + 1}`, 'Quadratic equations', `Find the sum of the roots of x² + (${b})x + ${c} = 0.`, val, `For x² + bx + c = 0, the sum of roots = −b = −(${b}) = ${val}.`, next()))
+    })
 
   return qs
 }
@@ -240,45 +318,45 @@ function buildPhysicsQuestions() {
   let pos = 0
   const next = () => pos++ % 4
 
-  ;[[2, 5], [3, 4], [5, 6], [4, 10], [6, 3]].forEach(([i0, r], i) => {
-    const val = i0 * r
-    qs.push(numericMCQ(`phy-1-${i + 1}`, "Ohm's law", `A current of ${i0} A flows through a resistor of ${r} Ω. Find the voltage across it.`, val, `By Ohm's law, V = IR = ${i0} × ${r} = ${val} V.`, next(), ' V'))
-  })
+    ;[[2, 5], [3, 4], [5, 6], [4, 10], [6, 3]].forEach(([i0, r], i) => {
+      const val = i0 * r
+      qs.push(numericMCQ(`phy-1-${i + 1}`, "Ohm's law", `A current of ${i0} A flows through a resistor of ${r} Ω. Find the voltage across it.`, val, `By Ohm's law, V = IR = ${i0} × ${r} = ${val} V.`, next(), ' V'))
+    })
 
-  ;[[5, 2], [10, 3], [4, 5], [8, 4], [6, 6]].forEach(([m, a], i) => {
-    const val = m * a
-    qs.push(numericMCQ(`phy-2-${i + 1}`, "Newton's second law", `A resultant force acts on a body of mass ${m} kg, giving it an acceleration of ${a} m/s². Find the force.`, val, `F = ma = ${m} × ${a} = ${val} N.`, next(), ' N'))
-  })
+    ;[[5, 2], [10, 3], [4, 5], [8, 4], [6, 6]].forEach(([m, a], i) => {
+      const val = m * a
+      qs.push(numericMCQ(`phy-2-${i + 1}`, "Newton's second law", `A resultant force acts on a body of mass ${m} kg, giving it an acceleration of ${a} m/s². Find the force.`, val, `F = ma = ${m} × ${a} = ${val} N.`, next(), ' N'))
+    })
 
-  ;[[50, 2], [20, 3], [80, 1], [25, 3], [12, 6]].forEach(([f, l], i) => {
-    const val = f * l
-    qs.push(numericMCQ(`phy-3-${i + 1}`, 'Waves', `A wave has a frequency of ${f} Hz and a wavelength of ${l} m. Find its speed.`, val, `Speed = frequency × wavelength = ${f} × ${l} = ${val} m/s.`, next(), ' m/s'))
-  })
+    ;[[50, 2], [20, 3], [80, 1], [25, 3], [12, 6]].forEach(([f, l], i) => {
+      const val = f * l
+      qs.push(numericMCQ(`phy-3-${i + 1}`, 'Waves', `A wave has a frequency of ${f} Hz and a wavelength of ${l} m. Find its speed.`, val, `Speed = frequency × wavelength = ${f} × ${l} = ${val} m/s.`, next(), ' m/s'))
+    })
 
-  ;[[20, 4], [30, 5], [24, 6], [36, 4], [45, 9]].forEach(([m, v], i) => {
-    const val = m / v
-    qs.push(numericMCQ(`phy-4-${i + 1}`, 'Density', `A substance has a mass of ${m} g and a volume of ${v} cm³. Find its density.`, val, `Density = mass/volume = ${m}/${v} = ${val} g/cm³.`, next(), ' g/cm³'))
-  })
+    ;[[20, 4], [30, 5], [24, 6], [36, 4], [45, 9]].forEach(([m, v], i) => {
+      const val = m / v
+      qs.push(numericMCQ(`phy-4-${i + 1}`, 'Density', `A substance has a mass of ${m} g and a volume of ${v} cm³. Find its density.`, val, `Density = mass/volume = ${m}/${v} = ${val} g/cm³.`, next(), ' g/cm³'))
+    })
 
-  ;[[2, 3], [4, 2], [2, 5], [5, 2], [4, 3]].forEach(([m, v], i) => {
-    const val = 0.5 * m * v * v
-    qs.push(numericMCQ(`phy-5-${i + 1}`, 'Kinetic energy', `Find the kinetic energy of a ${m} kg object moving at ${v} m/s.`, val, `KE = ½mv² = ½ × ${m} × ${v}² = ${val} J.`, next(), ' J'))
-  })
+    ;[[2, 3], [4, 2], [2, 5], [5, 2], [4, 3]].forEach(([m, v], i) => {
+      const val = 0.5 * m * v * v
+      qs.push(numericMCQ(`phy-5-${i + 1}`, 'Kinetic energy', `Find the kinetic energy of a ${m} kg object moving at ${v} m/s.`, val, `KE = ½mv² = ½ × ${m} × ${v}² = ${val} J.`, next(), ' J'))
+    })
 
-  ;[[4, 6], [3, 8], [5, 10], [8, 5], [6, 11]].forEach(([r1, r2], i) => {
-    const val = r1 + r2
-    qs.push(numericMCQ(`phy-6-${i + 1}`, 'Series circuits', `Two resistors of ${r1} Ω and ${r2} Ω are connected in series. Find the total resistance.`, val, `In series, total resistance = ${r1} + ${r2} = ${val} Ω.`, next(), ' Ω'))
-  })
+    ;[[4, 6], [3, 8], [5, 10], [8, 5], [6, 11]].forEach(([r1, r2], i) => {
+      const val = r1 + r2
+      qs.push(numericMCQ(`phy-6-${i + 1}`, 'Series circuits', `Two resistors of ${r1} Ω and ${r2} Ω are connected in series. Find the total resistance.`, val, `In series, total resistance = ${r1} + ${r2} = ${val} Ω.`, next(), ' Ω'))
+    })
 
-  ;[[10, 5], [20, 3], [15, 5], [8, 6], [12, 7]].forEach(([f, d], i) => {
-    const val = f * d
-    qs.push(numericMCQ(`phy-7-${i + 1}`, 'Work done', `Find the work done when a force of ${f} N moves an object through a distance of ${d} m.`, val, `Work = force × distance = ${f} × ${d} = ${val} J.`, next(), ' J'))
-  })
+    ;[[10, 5], [20, 3], [15, 5], [8, 6], [12, 7]].forEach(([f, d], i) => {
+      const val = f * d
+      qs.push(numericMCQ(`phy-7-${i + 1}`, 'Work done', `Find the work done when a force of ${f} N moves an object through a distance of ${d} m.`, val, `Work = force × distance = ${f} × ${d} = ${val} J.`, next(), ' J'))
+    })
 
-  ;[[100, 5], [200, 4], [150, 5], [240, 6], [90, 9]].forEach(([w, t], i) => {
-    const val = w / t
-    qs.push(numericMCQ(`phy-8-${i + 1}`, 'Power', `A machine does ${w} J of work in ${t} seconds. Find its power.`, val, `Power = work/time = ${w}/${t} = ${val} W.`, next(), ' W'))
-  })
+    ;[[100, 5], [200, 4], [150, 5], [240, 6], [90, 9]].forEach(([w, t], i) => {
+      const val = w / t
+      qs.push(numericMCQ(`phy-8-${i + 1}`, 'Power', `A machine does ${w} J of work in ${t} seconds. Find its power.`, val, `Power = work/time = ${w}/${t} = ${val} W.`, next(), ' W'))
+    })
 
   return qs
 }
@@ -311,15 +389,15 @@ function buildChemistryQuestions() {
   let pos = 0
   const next = () => pos++ % 4
 
-  ;[[90, 18], [80, 40], [132, 44], [58, 58], [54, 18]].forEach(([mass, molar], i) => {
-    const val = mass / molar
-    numericQs.push(numericMCQ(`chem-num-1-${i + 1}`, 'Moles', `A sample has a mass of ${mass} g and a molar mass of ${molar} g/mol. How many moles does it contain?`, val, `Moles = mass / molar mass = ${mass}/${molar} = ${val} mol.`, next(), ' mol'))
-  })
+    ;[[90, 18], [80, 40], [132, 44], [58, 58], [54, 18]].forEach(([mass, molar], i) => {
+      const val = mass / molar
+      numericQs.push(numericMCQ(`chem-num-1-${i + 1}`, 'Moles', `A sample has a mass of ${mass} g and a molar mass of ${molar} g/mol. How many moles does it contain?`, val, `Moles = mass / molar mass = ${mass}/${molar} = ${val} mol.`, next(), ' mol'))
+    })
 
-  ;[[2, 10, 4], [3, 12, 6], [4, 8, 2], [5, 10, 2], [6, 9, 3]].forEach(([p1, v1, p2], i) => {
-    const val = (p1 * v1) / p2
-    numericQs.push(numericMCQ(`chem-num-2-${i + 1}`, "Boyle's law", `A gas at ${p1} atm occupies ${v1} L. Find its volume when the pressure changes to ${p2} atm at constant temperature.`, val, `By Boyle's law, P₁V₁ = P₂V₂, so V₂ = (${p1}×${v1})/${p2} = ${val} L.`, next(), ' L'))
-  })
+    ;[[2, 10, 4], [3, 12, 6], [4, 8, 2], [5, 10, 2], [6, 9, 3]].forEach(([p1, v1, p2], i) => {
+      const val = (p1 * v1) / p2
+      numericQs.push(numericMCQ(`chem-num-2-${i + 1}`, "Boyle's law", `A gas at ${p1} atm occupies ${v1} L. Find its volume when the pressure changes to ${p2} atm at constant temperature.`, val, `By Boyle's law, P₁V₁ = P₂V₂, so V₂ = (${p1}×${v1})/${p2} = ${val} L.`, next(), ' L'))
+    })
 
   return [...elementQs, ...numericQs]
 }
@@ -684,11 +762,166 @@ export const commerceQuestions = factBank('com', 'Commerce', commercePairs, desc
 export const accountsQuestions = factBank('acc', 'Financial Accounting', accountsPairs, describePrompt, describeExplanation)
 
 // ---------------------------------------------------------------------------
+// Post UTME — Aptitude Test (OAU standard form)
+// ---------------------------------------------------------------------------
+// OAU's Post UTME screening is one general aptitude test every candidate
+// sits, regardless of field of study — unlike JAMB there is no subject-
+// specific "Use of English" paper. It's built from three sections, matching
+// the standard OAU Post UTME CBT format: Verbal Reasoning, Quantitative
+// Reasoning, and General Knowledge/Current Affairs.
+// ---------------------------------------------------------------------------
+
+const analogyQuestions = [
+  { id: 'apt-ana-1', instruction: 'Verbal reasoning — analogies', prompt: 'FINGER is to HAND as LEAF is to ___?', options: ['Tree', 'Root', 'Flower', 'Branch'], answer: 0, explanation: 'A finger is a part of a hand just as a leaf is a part of a tree.' },
+  { id: 'apt-ana-2', instruction: 'Verbal reasoning — analogies', prompt: 'PUPPY is to DOG as KITTEN is to ___?', options: ['Cat', 'Lion', 'Tiger', 'Fox'], answer: 0, explanation: 'A puppy is a young dog just as a kitten is a young cat.' },
+  { id: 'apt-ana-3', instruction: 'Verbal reasoning — analogies', prompt: 'DOCTOR is to HOSPITAL as TEACHER is to ___?', options: ['School', 'Market', 'Court', 'Farm'], answer: 0, explanation: 'A doctor works in a hospital just as a teacher works in a school.' },
+  { id: 'apt-ana-4', instruction: 'Verbal reasoning — analogies', prompt: 'PEN is to WRITE as KNIFE is to ___?', options: ['Cut', 'Draw', 'Paint', 'Measure'], answer: 0, explanation: 'A pen is used to write just as a knife is used to cut.' },
+  { id: 'apt-ana-5', instruction: 'Verbal reasoning — analogies', prompt: 'FISH is to WATER as BIRD is to ___?', options: ['Air', 'Nest', 'Tree', 'Cage'], answer: 0, explanation: 'A fish lives in water just as a bird lives in (flies through) the air.' },
+  { id: 'apt-ana-6', instruction: 'Verbal reasoning — analogies', prompt: 'AUTHOR is to BOOK as COMPOSER is to ___?', options: ['Music', 'Painting', 'Sculpture', 'Film'], answer: 0, explanation: 'An author creates a book just as a composer creates music.' },
+  { id: 'apt-ana-7', instruction: 'Verbal reasoning — analogies', prompt: 'HOUR is to MINUTE as MINUTE is to ___?', options: ['Second', 'Day', 'Week', 'Month'], answer: 0, explanation: 'An hour is divided into minutes just as a minute is divided into seconds.' },
+  { id: 'apt-ana-8', instruction: 'Verbal reasoning — analogies', prompt: 'TALL is to SHORT as FAST is to ___?', options: ['Slow', 'Quick', 'Swift', 'Rapid'], answer: 0, explanation: '"Tall" and "short" are opposites, just as "fast" and "slow" are opposites.' },
+  { id: 'apt-ana-9', instruction: 'Verbal reasoning — analogies', prompt: 'TAILOR is to CLOTHES as CARPENTER is to ___?', options: ['Furniture', 'Food', 'Jewelry', 'Pottery'], answer: 0, explanation: 'A tailor makes clothes just as a carpenter makes furniture.' },
+  { id: 'apt-ana-10', instruction: 'Verbal reasoning — analogies', prompt: 'CUB is to LION as CALF is to ___?', options: ['Cow', 'Goat', 'Sheep', 'Horse'], answer: 0, explanation: 'A cub is a baby lion just as a calf is a baby cow.' },
+  { id: 'apt-ana-11', instruction: 'Verbal reasoning — analogies', prompt: 'THERMOMETER is to TEMPERATURE as SPEEDOMETER is to ___?', options: ['Speed', 'Distance', 'Weight', 'Pressure'], answer: 0, explanation: 'A thermometer measures temperature just as a speedometer measures speed.' },
+  { id: 'apt-ana-12', instruction: 'Verbal reasoning — analogies', prompt: 'ISLAND is to WATER as OASIS is to ___?', options: ['Desert', 'Forest', 'Mountain', 'Valley'], answer: 0, explanation: 'An island is surrounded by water just as an oasis is surrounded by desert.' },
+  { id: 'apt-ana-13', instruction: 'Verbal reasoning — analogies', prompt: 'NOVEL is to CHAPTERS as HOUSE is to ___?', options: ['Rooms', 'Doors', 'Windows', 'Walls'], answer: 0, explanation: 'A novel is made up of chapters just as a house is made up of rooms.' },
+  { id: 'apt-ana-14', instruction: 'Verbal reasoning — analogies', prompt: 'SCULPTOR is to CHISEL as PAINTER is to ___?', options: ['Brush', 'Hammer', 'Needle', 'Saw'], answer: 0, explanation: 'A sculptor works with a chisel just as a painter works with a brush.' },
+  { id: 'apt-ana-15', instruction: 'Verbal reasoning — analogies', prompt: 'WATER is to THIRST as FOOD is to ___?', options: ['Hunger', 'Health', 'Taste', 'Energy'], answer: 0, explanation: 'Water satisfies thirst just as food satisfies hunger.' },
+  { id: 'apt-ana-16', instruction: 'Verbal reasoning — analogies', prompt: 'LIBRARY is to BOOKS as MUSEUM is to ___?', options: ['Artifacts', 'Letters', 'Clothes', 'Coins only'], answer: 0, explanation: 'A library houses books just as a museum houses artifacts.' },
+  { id: 'apt-ana-17', instruction: 'Verbal reasoning — analogies', prompt: 'OPTIMIST is to PESSIMIST as GENEROUS is to ___?', options: ['Stingy', 'Kind', 'Wealthy', 'Honest'], answer: 0, explanation: '"Optimist" and "pessimist" are opposites, just as "generous" and "stingy" are opposites.' },
+  { id: 'apt-ana-18', instruction: 'Verbal reasoning — analogies', prompt: 'BANK is to MONEY as GRANARY is to ___?', options: ['Grain', 'Water', 'Fuel', 'Clothing'], answer: 0, explanation: 'A bank stores money just as a granary stores grain.' },
+  { id: 'apt-ana-19', instruction: 'Verbal reasoning — analogies', prompt: 'DOCTOR is to PATIENT as LAWYER is to ___?', options: ['Client', 'Judge', 'Witness', 'Jury'], answer: 0, explanation: 'A doctor attends to a patient just as a lawyer attends to a client.' },
+  { id: 'apt-ana-20', instruction: 'Verbal reasoning — analogies', prompt: 'KEY is to LOCK as PASSWORD is to ___?', options: ['Account', 'Keyboard', 'Internet', 'Screen'], answer: 0, explanation: 'A key opens a lock just as a password opens (unlocks) an account.' },
+]
+
+function buildAptitudeQuantitative() {
+  const qs = []
+  let pos = 0
+  const next = () => pos++ % 4
+
+    ;[
+      { prompt: '2, 4, 6, 8, ?', val: 10, exp: 'Each term increases by 2, so the next term is 8 + 2 = 10.' },
+      { prompt: '3, 6, 12, 24, ?', val: 48, exp: 'Each term doubles the one before it, so the next term is 24 × 2 = 48.' },
+      { prompt: '1, 4, 9, 16, ?', val: 25, exp: 'This is the sequence of perfect squares (1², 2², 3², 4², 5²), so the next term is 5² = 25.' },
+      { prompt: '5, 10, 20, 40, ?', val: 80, exp: 'Each term doubles the one before it, so the next term is 40 × 2 = 80.' },
+      { prompt: '2, 5, 10, 17, ?', val: 26, exp: 'The differences between terms are 3, 5, 7 (increasing by 2 each time), so the next difference is 9, giving 17 + 9 = 26.' },
+    ].forEach((q, i) => {
+      qs.push(numericMCQ(`apt-quant-series-${i + 1}`, 'Quantitative reasoning — number series', `Find the next number in the series: ${q.prompt}`, q.val, q.exp, next()))
+    })
+
+    ;[
+      [[12, 18, 24, 30, 36]],
+      [[10, 20, 30, 40, 50]],
+      [[8, 12, 16, 20]],
+    ].forEach(([list], i) => {
+      const val = list.reduce((a, b) => a + b, 0) / list.length
+      qs.push(numericMCQ(`apt-quant-avg-${i + 1}`, 'Quantitative reasoning — averages', `Find the average of ${list.join(', ')}.`, val, `Average = sum of values ÷ number of values = ${list.reduce((a, b) => a + b, 0)} ÷ ${list.length} = ${val}.`, next()))
+    })
+
+    ;[
+      [60000, 2, 3],
+      [50000, 1, 4],
+      [90000, 2, 1],
+    ].forEach(([total, a, b], i) => {
+      const val = Math.round((total * b) / (a + b))
+      qs.push(numericMCQ(`apt-quant-ratio-${i + 1}`, 'Quantitative reasoning — ratios', `₦${total.toLocaleString()} is shared between two people in the ratio ${a}:${b}. Find the larger share.`, val, `Larger share = (${b}/(${a}+${b})) × ${total.toLocaleString()} = ${val}.`, next()))
+    })
+
+    ;[
+      [150, 3, 'speed'],
+      [120, 60, 'time'],
+      [45, 4, 'distance'],
+    ].forEach(([a, b, kind], i) => {
+      let val, prompt, exp
+      if (kind === 'speed') {
+        val = a / b
+        prompt = `A car travels ${a} km in ${b} hours. Find its average speed.`
+        exp = `Speed = distance ÷ time = ${a} ÷ ${b} = ${val} km/h.`
+      } else if (kind === 'time') {
+        val = a / b
+        prompt = `Find the time taken to cover ${a} km at a speed of ${b} km/h.`
+        exp = `Time = distance ÷ speed = ${a} ÷ ${b} = ${val} hours.`
+      } else {
+        val = a * b
+        prompt = `Find the distance covered in ${b} hours at a speed of ${a} km/h.`
+        exp = `Distance = speed × time = ${a} × ${b} = ${val} km.`
+      }
+      qs.push(numericMCQ(`apt-quant-sdt-${i + 1}`, 'Quantitative reasoning — speed, distance & time', prompt, val, exp, next()))
+    })
+
+    ;[
+      [4, 10, 'father-son'],
+      [15, 5, 'siblings'],
+      [50, 30, 'sum'],
+    ].forEach(([a, b, kind], i) => {
+      let val, prompt, exp
+      if (kind === 'father-son') {
+        val = a * b
+        prompt = `A father is ${a} times as old as his son. If the son is ${b} years old, how old is the father?`
+        exp = `Father's age = ${a} × ${b} = ${val} years.`
+      } else if (kind === 'siblings') {
+        val = a + b
+        prompt = `Tomiwa is ${b} years older than his sister. If his sister is ${a} years old, how old is Tomiwa?`
+        exp = `Tomiwa's age = ${a} + ${b} = ${val} years.`
+      } else {
+        val = a - b
+        prompt = `The sum of two numbers is ${a} and one of them is ${b}. Find the other number.`
+        exp = `Other number = ${a} − ${b} = ${val}.`
+      }
+      qs.push(numericMCQ(`apt-quant-word-${i + 1}`, 'Quantitative reasoning — problem solving', prompt, val, exp, next()))
+    })
+
+    ;[
+      [2000, 2500, 'profit-pct'],
+      [8000, 25, 'discount-amt'],
+      [60, 40, 'find-number'],
+    ].forEach(([a, b, kind], i) => {
+      let val, prompt, exp
+      if (kind === 'profit-pct') {
+        val = Math.round(((b - a) / a) * 100)
+        prompt = `A trader buys an item for ₦${a.toLocaleString()} and sells it for ₦${b.toLocaleString()}. Find the percentage profit.`
+        exp = `Percentage profit = ((${b} − ${a}) / ${a}) × 100 = ${val}%.`
+      } else if (kind === 'discount-amt') {
+        val = Math.round((b / 100) * a)
+        prompt = `An item originally priced at ₦${a.toLocaleString()} is sold at a ${b}% discount. Find the discount amount.`
+        exp = `Discount = (${b}/100) × ${a.toLocaleString()} = ₦${val.toLocaleString()}.`
+      } else {
+        val = Math.round(a / (b / 100))
+        prompt = `${b}% of a number is ${a}. Find the number.`
+        exp = `Number = ${a} ÷ (${b}/100) = ${val}.`
+      }
+      qs.push(numericMCQ(`apt-quant-pct-${i + 1}`, 'Quantitative reasoning — percentages', prompt, val, exp, next()))
+    })
+
+  return qs
+}
+
+const generalKnowledgePairs = [
+  ['What is the capital city of Nigeria?', 'Abuja'],
+  ['What is the official currency of Nigeria?', 'Naira'],
+  ['In which state is Obafemi Awolowo University (OAU) located?', 'Osun State'],
+  ['What is the official language of Nigeria?', 'English'],
+  ['How many states make up the Federal Republic of Nigeria?', '36'],
+  ['Which river is the longest in Nigeria?', 'River Niger'],
+  ['What does the acronym "ECOWAS" stand for?', 'Economic Community of West African States'],
+  ['Obafemi Awolowo University was originally established under what name?', 'University of Ife'],
+  ['Which continent is Nigeria located in?', 'Africa'],
+  ['Which organ of the human body is primarily responsible for pumping blood?', 'The heart'],
+]
+
+export const aptitudeQuestions = [
+  ...analogyQuestions,
+  ...buildAptitudeQuantitative(),
+  ...qaBank('apt-gk', 'General knowledge & current affairs', generalKnowledgePairs),
+]
+
+// ---------------------------------------------------------------------------
 // Combined question bank
 // ---------------------------------------------------------------------------
 
 export const questionBank = {
   english: englishQuestions,
+  aptitude_test: aptitudeQuestions,
   mathematics: mathematicsQuestions,
   physics: physicsQuestions,
   chemistry: chemistryQuestions,
@@ -711,53 +944,99 @@ export function pickQuestions(subjectId, count) {
   return Array.from({ length: count }, (_, i) => bank[i % bank.length])
 }
 
-// Loads questions for a subject. If the admin has added questions for it in
-// Supabase (`questions` table) those are served; otherwise (no rows, table
-// missing, offline) it falls back to the built-in bank above.
-export async function fetchQuestions(subjectId, count) {
+// Exam years a student can choose from, newest first (2026 … 2000).
+export const examYears = Array.from({ length: 2026 - 2000 + 1 }, (_, i) => 2026 - i)
+
+const hasBuiltInBank = (subjectId, examType) =>
+  examType === 'jamb' || (examType === 'post_utme' && subjectId === 'aptitude_test')
+
+// Limits a `questions` query to one exam type. Rows saved before exam_type
+// existed have exam_type = null — treat those as JAMB content so nothing
+// already uploaded silently disappears.
+const scopeToExamType = (query, examType) =>
+  examType === 'jamb' ? query.or('exam_type.eq.jamb,exam_type.is.null') : query.eq('exam_type', examType)
+
+// Topics available for a subject (optionally within one exam year), with how
+// many questions each has. Built-in questions carry no year, so a specific
+// year lists uploaded topics only.
+export async function fetchTopics(subjectId, examType = 'jamb', year = null) {
+  const counts = new Map()
+  const add = (topic) => {
+    if (topic) counts.set(topic, (counts.get(topic) ?? 0) + 1)
+  }
+
+  if (hasBuiltInBank(subjectId, examType) && !year) {
+    ;(questionBank[subjectId] || []).forEach((q) => add(q.instruction))
+  }
+
   try {
-    const { data, error } = await supabase
+    let query = supabase.from('questions').select('instruction').eq('subject', subjectId)
+    query = scopeToExamType(query, examType)
+    if (year) query = query.eq('year', year)
+    const { data, error } = await query.limit(2000)
+    if (!error && data) data.forEach((row) => add(row.instruction))
+  } catch {
+    // offline / table missing — built-in topics only
+  }
+
+  return [...counts]
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => a.topic.localeCompare(b.topic))
+}
+
+// Loads questions for a subject and exam type. Admin-uploaded questions
+// (Supabase `questions` table, filtered by both subject and exam_type) are
+// ADDED to the built-in bank for JAMB, so that pool only ever grows. Post
+// UTME and OAU Courses have no built-in bank for their field-specific
+// elective subjects — those are 100% admin content, so an empty result
+// there means "not added yet" (handled by the UI as a friendly empty state,
+// not an error). The one exception is the Post UTME Aptitude Test itself,
+// which does have a built-in bank (above), since every Post UTME candidate
+// sits it regardless of field of study.
+//
+// Optional filters: `year` (an exam year — built-in questions have no year,
+// so a year only returns uploaded questions) and `topics` (matched against
+// each question's topic/instruction). When the student narrows the pool this
+// way we return only what exists rather than repeating questions to pad it.
+export async function fetchQuestions(subjectId, count, examType = 'jamb', { year = null, topics = [] } = {}) {
+  const filtered = Boolean(year) || topics.length > 0
+
+  let uploaded = []
+  try {
+    let query = supabase
       .from('questions')
       .select('id,instruction,prompt,options,answer,explanation')
       .eq('subject', subjectId)
-      .limit(500)
-    if (error || !data || data.length === 0) return pickQuestions(subjectId, count)
-
-    // Shuffle so repeat attempts differ, then trim (or cycle) to the target count.
-    const shuffled = [...data].sort(() => Math.random() - 0.5)
-    if (shuffled.length >= count) return shuffled.slice(0, count)
-    return Array.from({ length: count }, (_, i) => shuffled[i % shuffled.length])
+    query = scopeToExamType(query, examType)
+    if (year) query = query.eq('year', year)
+    if (topics.length > 0) query = query.in('instruction', topics)
+    const { data, error } = await query.limit(1000)
+    if (!error && data) uploaded = data
   } catch {
-    return pickQuestions(subjectId, count)
+    // offline / table missing — fall through
   }
+
+  let builtIn = hasBuiltInBank(subjectId, examType) && !year ? questionBank[subjectId] || [] : []
+  if (topics.length > 0) builtIn = builtIn.filter((q) => topics.includes(q.instruction))
+
+  const pool = [...builtIn, ...uploaded]
+  if (pool.length === 0) return []
+
+  // Fisher-Yates shuffle (unbiased, unlike sort(() => Math.random() - 0.5)),
+  // so every session draws a fresh random selection from the whole pool.
+  const shuffled = [...pool]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  if (filtered) return shuffled.slice(0, count)
+  if (shuffled.length >= count) return shuffled.slice(0, count)
+  return Array.from({ length: count }, (_, i) => shuffled[i % shuffled.length])
 }
 
 // ---------------------------------------------------------------------------
 // Dashboard / progress display data
 // ---------------------------------------------------------------------------
-
-export const weeklyActivity = [
-  { day: 'Mon', value: 16 },
-  { day: 'Tue', value: 20 },
-  { day: 'Wed', value: 24 },
-  { day: 'Thu', value: 20 },
-  { day: 'Fri', value: 32 },
-  { day: 'Sat', value: 28 },
-  { day: 'Sun', value: 36 },
-]
-
-export const subjectPerformance = [
-  { subject: 'Mathematics', accuracy: 82 },
-  { subject: 'Use of English', accuracy: 76 },
-  { subject: 'Physics', accuracy: 69 },
-  { subject: 'Chemistry', accuracy: 88 },
-]
-
-export const weakTopics = [
-  { topic: 'Number bases', subject: 'mathematics', accuracy: 52, questions: 8 },
-  { topic: 'Series circuits', subject: 'physics', accuracy: 58, questions: 8 },
-  { topic: 'Periodic table', subject: 'chemistry', accuracy: 61, questions: 8 },
-]
 
 export const pastPapers = [
   { id: 'jamb-math-2024', title: 'JAMB Mathematics — 2024', subject: 'mathematics', meta: 'Number bases, algebra, mensuration' },
@@ -766,7 +1045,8 @@ export const pastPapers = [
 ]
 
 // One full 4-subject combo per stream (compulsory + first N electives),
-// used for the "quick start" full mock on the Mock Exams page.
+// used for the "quick start" full mock on the Mock Exams page. JAMB only —
+// Post UTME uses `postUtmeStreams` the same way if a Post UTME mock is added.
 export const mockExams = streams.map((stream) => ({
   id: `${stream.id}-full-mock`,
   streamId: stream.id,

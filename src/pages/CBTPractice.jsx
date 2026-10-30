@@ -14,6 +14,10 @@ import {
 import { fetchQuestions, subjectMeta, subjectQuestionCount } from '../data/mockData'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import { logAttempt, logAttempts } from '../lib/attemptsApi'
+import { FREE_TRIAL_QUESTIONS } from '../lib/paymentsApi'
+import useEntitlements from '../hooks/useEntitlements'
+import UnlockCard from '../components/UnlockCard'
 
 const EXAM_SECONDS = 2 * 60 * 60 // 2 hours, fixed regardless of subject count
 
@@ -38,37 +42,81 @@ function LoadingState({ label }) {
 export default function CBTPractice() {
   const [params] = useSearchParams()
   const mode = params.get('mode') || 'study'
+  const examType = params.get('examType') || 'jamb'
+  const year = params.get('year') ? Number(params.get('year')) : null
+  const topics = params.getAll('topic')
+  const { loading: accessLoading, isPaid } = useEntitlements()
+
+  if (accessLoading) return <LoadingState label="Checking your access…" />
+  const paid = isPaid(examType)
 
   if (mode === 'exam') {
     const subjectIds = (params.get('subjects') || '').split(',').filter(Boolean)
     const streamId = params.get('stream') || 'unknown'
-    return <ExamLoader key={subjectIds.join(',')} subjectIds={subjectIds} streamId={streamId} />
+    return (
+      <ExamLoader
+        key={`${examType}-${subjectIds.join(',')}-${year}`}
+        subjectIds={subjectIds}
+        streamId={streamId}
+        examType={examType}
+        paid={paid}
+        year={year}
+      />
+    )
   }
 
   const subjectId = params.get('subject') || 'mathematics'
-  return <StudyLoader key={subjectId} subjectId={subjectId} />
+  return (
+    <StudyLoader
+      key={`${examType}-${subjectId}-${paid}-${year}-${topics.join('|')}`}
+      subjectId={subjectId}
+      examType={examType}
+      paid={paid}
+      year={year}
+      topics={topics}
+    />
+  )
+}
+
+// Free users get a 10-question trial per subject; paying unlocks the full count.
+function sittingCount(subjectId, examType, paid) {
+  const full = subjectQuestionCount(subjectId, examType)
+  return paid ? full : Math.min(FREE_TRIAL_QUESTIONS, full)
 }
 
 // Loaders fetch questions (admin-added ones from Supabase, else the built-in
 // bank) and only mount the session once they are ready.
-function StudyLoader({ subjectId }) {
+function StudyLoader({ subjectId, examType, paid, year, topics }) {
   const [questions, setQuestions] = useState(null)
+  const [round, setRound] = useState(0) // bumped on "Practice again" to draw a fresh set
 
   useEffect(() => {
     let active = true
-    fetchQuestions(subjectId, subjectQuestionCount(subjectId)).then((qs) => {
+    setQuestions(null)
+    fetchQuestions(subjectId, sittingCount(subjectId, examType, paid), examType, { year, topics }).then((qs) => {
       if (active) setQuestions(qs)
     })
     return () => {
       active = false
     }
-  }, [subjectId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectId, examType, paid, round, year, topics.join('|')])
 
   if (!questions) return <LoadingState label="Loading questions…" />
-  return <StudySession subjectId={subjectId} questions={questions} />
+  return (
+    <StudySession
+      subjectId={subjectId}
+      questions={questions}
+      examType={examType}
+      paid={paid}
+      year={year}
+      filtered={Boolean(year) || topics.length > 0}
+      onRestart={() => setRound((r) => r + 1)}
+    />
+  )
 }
 
-function ExamLoader({ subjectIds, streamId }) {
+function ExamLoader({ subjectIds, streamId, examType, paid, year }) {
   const [subjects, setSubjects] = useState(null)
 
   useEffect(() => {
@@ -77,7 +125,7 @@ function ExamLoader({ subjectIds, streamId }) {
       subjectIds.map(async (id) => ({
         id,
         name: subjectMeta[id]?.name || id,
-        questions: await fetchQuestions(id, subjectQuestionCount(id)),
+        questions: await fetchQuestions(id, sittingCount(id, examType, paid), examType, { year }),
       }))
     ).then((result) => {
       if (active) setSubjects(result)
@@ -85,18 +133,39 @@ function ExamLoader({ subjectIds, streamId }) {
     return () => {
       active = false
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subjectIds.join(',')])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectIds.join(','), examType, paid, year])
 
   if (!subjects) return <LoadingState label="Preparing your exam…" />
-  return <ExamSession subjects={subjects} streamId={streamId} />
+
+  // A subject with no questions (e.g. none uploaded for that year yet) can't be sat.
+  const missing = subjects.filter((s) => s.questions.length === 0)
+  if (missing.length > 0) {
+    return (
+      <div className="mx-auto max-w-md py-20 text-center">
+        <p className="font-heading text-lg font-bold">Not enough questions yet</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {year ? `No ${year} questions have been added for ` : 'No questions have been added yet for '}
+          {missing.map((s) => s.name).join(', ')}. {year ? 'Try another year or "All years".' : 'Check back soon.'}
+        </p>
+        <Link
+          to="/practice"
+          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90"
+        >
+          Back to practice
+        </Link>
+      </div>
+    )
+  }
+  return <ExamSession subjects={subjects} streamId={streamId} examType={examType} paid={paid} />
 }
 
 // ---------------------------------------------------------------------------
 // Study Mode — one subject, untimed, immediate explanation on answering
 // ---------------------------------------------------------------------------
 
-function StudySession({ subjectId, questions }) {
+function StudySession({ subjectId, questions, examType, paid, year, filtered, onRestart }) {
+  const { user } = useAuth()
   const subjectName = subjectMeta[subjectId]?.name || subjectId
 
   const [index, setIndex] = useState(0)
@@ -110,13 +179,22 @@ function StudySession({ subjectId, questions }) {
   const selectOption = (i) => {
     if (revealed) return
     setAnswers((prev) => ({ ...prev, [index]: i }))
+
+    // Log this answered question for weak-topic detection & dashboard stats.
+    // Fire-and-forget — never blocks the UI, and a failure is silent to the student.
+    logAttempt({
+      userId: user?.id,
+      examType,
+      subject: subjectId,
+      instruction: question.instruction,
+      mode: 'study',
+      questionId: question.id,
+      isCorrect: i === question.answer,
+    })
   }
 
-  const restart = () => {
-    setIndex(0)
-    setAnswers({})
-    setFinished(false)
-  }
+  // "Practice again" loads a brand-new random set instead of replaying the same questions
+  const restart = () => onRestart()
 
   if (finished) {
     const correct = questions.filter((q, i) => answers[i] === q.answer).length
@@ -145,6 +223,26 @@ function StudySession({ subjectId, questions }) {
             </Link>
           </div>
         </div>
+        {!paid && <UnlockCard examType={examType} />}
+      </div>
+    )
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="mx-auto max-w-md py-20 text-center">
+        <p className="font-heading text-lg font-bold">No questions yet</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {filtered
+            ? `No ${subjectName} questions match your year and topic selection. Go back and adjust your options.`
+            : `${subjectName} questions haven't been added for this exam type yet. Check back soon.`}
+        </p>
+        <Link
+          to="/practice"
+          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-5 font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90"
+        >
+          Back to practice
+        </Link>
       </div>
     )
   }
@@ -158,7 +256,9 @@ function StudySession({ subjectId, questions }) {
           <ArrowLeft size={16} className="mr-1" />
           Exit
         </Link>
-        <span className="rounded-lg bg-secondary px-3 py-2 text-sm font-bold text-primary">Study Mode</span>
+        <span className="rounded-lg bg-secondary px-3 py-2 text-sm font-bold text-primary">
+          {year ? `${year} · Study Mode` : 'Study Mode'}
+        </span>
       </div>
 
       <div className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6">
@@ -252,7 +352,7 @@ function StudySession({ subjectId, questions }) {
 // Exam Mode — full 4-subject combo, 2-hour timer, /400 grading, optional review
 // ---------------------------------------------------------------------------
 
-function ExamSession({ subjects, streamId }) {
+function ExamSession({ subjects, streamId, examType, paid }) {
   const [activeSubject, setActiveSubject] = useState(0)
   const [indexBySubject, setIndexBySubject] = useState(() => subjects.map(() => 0))
   const [answers, setAnswers] = useState(() => subjects.map((s) => Array(s.questions.length).fill(null)))
@@ -297,7 +397,7 @@ function ExamSession({ subjects, streamId }) {
   const totalQuestions = subjects.reduce((sum, s) => sum + s.questions.length, 0)
 
   if (finished) {
-    return <ExamResult subjects={subjects} answers={answers} streamId={streamId} />
+    return <ExamResult subjects={subjects} answers={answers} streamId={streamId} examType={examType} paid={paid} />
   }
 
   return (
@@ -312,9 +412,8 @@ function ExamSession({ subjects, streamId }) {
             {totalAnswered}/{totalQuestions} answered
           </span>
           <span
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold tabular-nums ${
-              timeLeft < 300 ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-primary'
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold tabular-nums ${timeLeft < 300 ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-primary'
+              }`}
           >
             <Clock size={16} />
             {formatClock(timeLeft)}
@@ -330,9 +429,8 @@ function ExamSession({ subjects, streamId }) {
             <button
               key={s.id}
               onClick={() => setActiveSubject(i)}
-              className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                i === activeSubject ? 'bg-primary text-primary-foreground' : 'border border-border bg-card text-muted-foreground'
-              }`}
+              className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${i === activeSubject ? 'bg-primary text-primary-foreground' : 'border border-border bg-card text-muted-foreground'
+                }`}
             >
               {subjectMeta[s.id]?.short || s.name}
               <span className="text-xs opacity-80">
@@ -362,14 +460,12 @@ function ExamSession({ subjects, streamId }) {
                 <button
                   key={option}
                   onClick={() => selectOption(i)}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl border p-3 text-left text-sm font-medium transition-colors ${
-                    active ? 'border-2 border-primary bg-card font-semibold' : 'border-border bg-card hover:border-primary'
-                  }`}
+                  className={`flex min-h-12 items-center gap-3 rounded-xl border p-3 text-left text-sm font-medium transition-colors ${active ? 'border-2 border-primary bg-card font-semibold' : 'border-border bg-card hover:border-primary'
+                    }`}
                 >
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                      active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                    }`}
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}
                   >
                     {String.fromCharCode(65 + i)}
                   </span>
@@ -415,13 +511,12 @@ function ExamSession({ subjects, streamId }) {
           <button
             key={q.id}
             onClick={() => goToQuestion(activeSubject, i)}
-            className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${
-              i === qIndex
-                ? 'bg-primary text-primary-foreground'
-                : answers[activeSubject][i] != null
+            className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold transition-colors ${i === qIndex
+              ? 'bg-primary text-primary-foreground'
+              : answers[activeSubject][i] != null
                 ? 'bg-secondary text-primary'
                 : 'border border-border bg-card text-muted-foreground'
-            }`}
+              }`}
           >
             {i + 1}
           </button>
@@ -431,7 +526,7 @@ function ExamSession({ subjects, streamId }) {
   )
 }
 
-function ExamResult({ subjects, answers, streamId }) {
+function ExamResult({ subjects, answers, streamId, examType, paid }) {
   const { user } = useAuth()
   const [expanded, setExpanded] = useState({})
   const [revealAll, setRevealAll] = useState(false)
@@ -446,7 +541,8 @@ function ExamResult({ subjects, answers, streamId }) {
     return { breakdown: rows, total400: rows.reduce((sum, b) => sum + b.score100, 0) }
   }, [subjects, answers])
 
-  // Save this attempt once so admins can track group effectiveness.
+  // Save this attempt once so admins can track group effectiveness, and log
+  // every answered question for the student's own dashboard/performance data.
   // Best-effort: a failure (e.g. table not created yet) never affects the student.
   useEffect(() => {
     if (savedRef.current || !user) return
@@ -457,6 +553,7 @@ function ExamResult({ subjects, answers, streamId }) {
       .insert({
         user_id: user.id,
         user_email: user.email,
+        exam_type: examType,
         stream: streamId,
         subjects: breakdown.map((b) => b.id),
         subject_scores: subjectScores,
@@ -465,7 +562,23 @@ function ExamResult({ subjects, answers, streamId }) {
       .then(({ error }) => {
         if (error) console.warn('[EXAMHUB] Could not save exam attempt:', error.message)
       })
-  }, [user, breakdown, total400, streamId])
+
+    const attemptRows = subjects.flatMap((s, si) =>
+      s.questions
+        .map((q, qi) => ({
+          userId: user.id,
+          examType,
+          subject: s.id,
+          instruction: q.instruction,
+          mode: 'exam',
+          questionId: q.id,
+          isCorrect: answers[si][qi] === q.answer,
+          answered: answers[si][qi] != null,
+        }))
+        .filter((r) => r.answered)
+    )
+    logAttempts(attemptRows)
+  }, [user, breakdown, total400, streamId, examType, subjects, answers])
 
   const toggle = (key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
 
@@ -503,6 +616,8 @@ function ExamResult({ subjects, answers, streamId }) {
           </button>
         </div>
       </div>
+
+      {!paid && <UnlockCard examType={examType} />}
 
       <div className="space-y-4">
         {breakdown.map((b, si) => (

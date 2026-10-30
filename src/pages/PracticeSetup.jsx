@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   FlaskConical,
   Landmark,
@@ -10,27 +10,56 @@ import {
   Timer,
   Lock,
   Check,
+  GraduationCap,
 } from 'lucide-react'
-import { streams, subjectMeta, streamSubjectIds, subjectQuestionCount } from '../data/mockData'
+import {
+  examTypes,
+  fieldsOfStudyByExamType,
+  oauCoursesFor,
+  subjectMeta,
+  streamSubjectIds,
+  subjectQuestionCount,
+} from '../data/mockData'
+import useEntitlements from '../hooks/useEntitlements'
+import UnlockCard from '../components/UnlockCard'
+import { StudyOptions, ExamOptions } from '../components/SessionOptions'
+import { FREE_TRIAL_QUESTIONS } from '../lib/paymentsApi'
+
+// What a student will actually get: free users are capped at the trial size.
+const sittingCount = (id, examType, paid) => {
+  const full = subjectQuestionCount(id, examType)
+  return paid ? full : Math.min(FREE_TRIAL_QUESTIONS, full)
+}
 
 const streamIcons = { FlaskConical, Landmark, Briefcase }
 
 export default function PracticeSetup() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const examType = params.get('examType')
   const mode = params.get('mode')
   const streamId = params.get('stream')
+  const subject = params.get('subject') // chosen subject / OAU course, awaiting options
+  const optionsStep = params.get('options') === '1' // exam combination chosen, awaiting options
   const [electives, setElectives] = useState([])
+  const { isPaid } = useEntitlements()
 
-  const activeStream = useMemo(() => streams.find((s) => s.id === streamId) || null, [streamId])
+  const fields = examType ? fieldsOfStudyByExamType[examType] || [] : []
+  const activeStream = useMemo(() => fields.find((s) => s.id === streamId) || null, [fields, streamId])
+  const isOau = examType === 'oau'
 
-  const setMode = (m) => setParams({ mode: m })
+  const selectExamType = (id) => setParams({ examType: id })
   const selectStream = (id) => {
     setElectives([])
-    setParams({ mode, stream: id })
+    setParams({ examType, stream: id })
   }
+  const setMode = (m) => setParams({ examType, stream: streamId, mode: m })
+
   const goBack = () => {
-    if (streamId) return setParams({ mode })
+    if (subject) return setParams(mode ? { examType, stream: streamId, mode } : { examType, stream: streamId })
+    if (optionsStep) return setParams({ examType, stream: streamId, mode })
+    if (mode) return setParams({ examType, stream: streamId })
+    if (streamId) return setParams({ examType })
     setParams({})
   }
 
@@ -43,15 +72,39 @@ export default function PracticeSetup() {
     })
   }
 
-  const startExam = () => {
-    const subjects = [...activeStream.compulsory, ...electives]
-    navigate(`/practice/session?mode=exam&stream=${activeStream.id}&subjects=${subjects.join(',')}`)
+  const selectSubject = (id) =>
+    setParams(mode ? { examType, stream: streamId, mode, subject: id } : { examType, stream: streamId, subject: id })
+
+  // Combination chosen -> go to the options step (year) before the exam starts.
+  const goToExamOptions = () => setParams({ examType, stream: streamId, mode: 'exam', options: '1' })
+
+  const startStudy = ({ year, topics }) => {
+    const qs = new URLSearchParams({ examType, mode: 'study', subject })
+    if (year) qs.set('year', year)
+    topics.forEach((t) => qs.append('topic', t))
+    navigate(`/practice/session?${qs}`)
   }
+
+  const examSubjects = activeStream ? [...activeStream.compulsory, ...electives] : []
+  const examOptionsReady = optionsStep && activeStream && electives.length === activeStream.electiveCount
+
+  const startExam = ({ year }) => {
+    const qs = new URLSearchParams({
+      examType,
+      mode: 'exam',
+      stream: activeStream.id,
+      subjects: examSubjects.join(','),
+    })
+    if (year) qs.set('year', year)
+    navigate(`/practice/session?${qs}`)
+  }
+
+  const showBack = Boolean(examType)
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8">
       <header className="flex items-center gap-3">
-        {(mode) && (
+        {showBack && (
           <button
             onClick={goBack}
             aria-label="Go back"
@@ -66,18 +119,90 @@ export default function PracticeSetup() {
         </div>
       </header>
 
-      {!mode && <ModePicker onSelect={setMode} />}
-      {mode && !streamId && <StreamPicker onSelect={selectStream} />}
-      {mode === 'study' && activeStream && <StudySubjectPicker stream={activeStream} />}
-      {mode === 'exam' && activeStream && (
+      {examType && !isPaid(examType) && <UnlockCard examType={examType} compact />}
+
+      {!examType && <ExamTypePicker onSelect={selectExamType} />}
+
+      {examType && !streamId && <FieldOfStudyPicker fields={fields} onSelect={selectStream} />}
+
+      {/* OAU Courses: no Mode step — straight to the course list */}
+      {isOau && activeStream && !subject && (
+        <OauCoursePicker fieldOfStudyId={activeStream.id} onSelect={selectSubject} />
+      )}
+      {isOau && activeStream && subject && (
+        <StudyOptions key={subject} examType={examType} subjectId={subject} onStart={startStudy} />
+      )}
+
+      {/* JAMB / Post UTME: same Mode -> Subject flow */}
+      {!isOau && activeStream && !mode && <ModePicker onSelect={setMode} />}
+      {!isOau && activeStream && mode === 'study' && !subject && (
+        <StudySubjectPicker
+          stream={activeStream}
+          examType={examType}
+          paid={isPaid(examType)}
+          onSelect={selectSubject}
+        />
+      )}
+      {!isOau && activeStream && mode === 'study' && subject && (
+        <StudyOptions key={subject} examType={examType} subjectId={subject} onStart={startStudy} />
+      )}
+      {!isOau && activeStream && mode === 'exam' && !examOptionsReady && (
         <ExamCombinationPicker
+          examType={examType}
+          paid={isPaid(examType)}
           stream={activeStream}
           electives={electives}
           onToggle={toggleElective}
-          onStart={startExam}
+          onStart={goToExamOptions}
         />
       )}
+      {!isOau && activeStream && mode === 'exam' && examOptionsReady && (
+        <ExamOptions subjectIds={examSubjects} onStart={startExam} />
+      )}
     </div>
+  )
+}
+
+function ExamTypePicker({ onSelect }) {
+  return (
+    <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {examTypes.map((type) => (
+        <button
+          key={type.id}
+          onClick={() => onSelect(type.id)}
+          className="group flex flex-col items-center rounded-2xl border border-border bg-card p-6 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
+            <GraduationCap size={22} />
+          </span>
+          <h3 className="mt-4 font-heading text-base font-bold">{type.name}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{type.blurb}</p>
+        </button>
+      ))}
+    </section>
+  )
+}
+
+function FieldOfStudyPicker({ fields, onSelect }) {
+  return (
+    <section className={`grid grid-cols-1 gap-4 ${fields.length > 1 ? 'sm:grid-cols-3' : 'sm:max-w-xs'}`}>
+      {fields.map((field) => {
+        const Icon = streamIcons[field.icon] || FlaskConical
+        return (
+          <button
+            key={field.id}
+            onClick={() => onSelect(field.id)}
+            className="group flex flex-col items-center rounded-2xl border border-border bg-card p-6 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
+              <Icon size={22} />
+            </span>
+            <h3 className="mt-4 font-heading text-base font-bold">{field.name}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">{field.tagline}</p>
+          </button>
+        )
+      })}
+    </section>
   )
 }
 
@@ -109,55 +234,56 @@ function ModePicker({ onSelect }) {
   )
 }
 
-function StreamPicker({ onSelect }) {
-  return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      {streams.map((stream) => {
-        const Icon = streamIcons[stream.icon]
-        return (
-          <button
-            key={stream.id}
-            onClick={() => onSelect(stream.id)}
-            className="group flex flex-col items-center rounded-2xl border border-border bg-card p-6 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
-          >
-            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
-              <Icon size={22} />
-            </span>
-            <h3 className="mt-4 font-heading text-base font-bold">{stream.name}</h3>
-            <p className="mt-1 text-xs text-muted-foreground">{stream.tagline}</p>
-          </button>
-        )
-      })}
-    </section>
-  )
-}
-
-function StudySubjectPicker({ stream }) {
+function StudySubjectPicker({ stream, examType, paid, onSelect }) {
   const subjectIds = streamSubjectIds(stream)
   return (
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {subjectIds.map((id) => (
-        <Link
+        <button
           key={id}
-          to={`/practice/session?mode=study&subject=${id}`}
+          onClick={() => onSelect(id)}
           className="group flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
         >
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
             <BookOpen size={20} />
           </span>
           <p className="mt-3 text-sm font-bold">{subjectMeta[id].short}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{subjectQuestionCount(id)} Qs</p>
-        </Link>
+          <p className="mt-0.5 text-xs text-muted-foreground">{sittingCount(id, examType, paid)} Qs</p>
+        </button>
       ))}
     </section>
   )
 }
 
-function ExamCombinationPicker({ stream, electives, onToggle, onStart }) {
+function OauCoursePicker({ fieldOfStudyId, onSelect }) {
+  const courses = oauCoursesFor(fieldOfStudyId)
+  return (
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      {courses.map((course) => (
+        <button
+          key={course.id}
+          onClick={() => onSelect(course.id)}
+          className="group flex flex-col items-center rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-theme"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-secondary text-primary transition-transform group-hover:scale-105">
+            <BookOpen size={20} />
+          </span>
+          <p className="mt-3 text-sm font-bold">{course.code}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{course.title}</p>
+        </button>
+      ))}
+      {courses.length === 0 && (
+        <p className="col-span-full text-sm text-muted-foreground">No courses added for this field yet.</p>
+      )}
+    </section>
+  )
+}
+
+function ExamCombinationPicker({ examType, paid, stream, electives, onToggle, onStart }) {
   const ready = electives.length === stream.electiveCount
   const totalQuestions =
-    stream.compulsory.reduce((sum, id) => sum + subjectQuestionCount(id), 0) +
-    electives.reduce((sum, id) => sum + subjectQuestionCount(id), 0)
+    stream.compulsory.reduce((sum, id) => sum + sittingCount(id, examType, paid), 0) +
+    electives.reduce((sum, id) => sum + sittingCount(id, examType, paid), 0)
 
   return (
     <section className="space-y-6">
@@ -189,16 +315,14 @@ function ExamCombinationPicker({ stream, electives, onToggle, onStart }) {
                 key={id}
                 disabled={disabled}
                 onClick={() => onToggle(id)}
-                className={`flex flex-col items-center rounded-2xl border p-5 text-center transition-all ${
-                  active
+                className={`flex flex-col items-center rounded-2xl border p-5 text-center transition-all ${active
                     ? 'border-2 border-primary bg-secondary'
                     : 'border-border bg-card hover:border-primary disabled:opacity-40 disabled:hover:border-border'
-                }`}
+                  }`}
               >
                 <span
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    }`}
                 >
                   {active ? <Check size={18} /> : <BookOpen size={18} />}
                 </span>

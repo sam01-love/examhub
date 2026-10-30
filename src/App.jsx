@@ -13,6 +13,7 @@ import CBTPractice from './pages/CBTPractice'
 import MockExams from './pages/MockExams'
 import Performance from './pages/Performance'
 import Settings from './pages/Settings'
+import PaymentStatus from './pages/PaymentStatus'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/mock-exams" element={<MockExams />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/payment/verify" element={<PaymentStatus />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />

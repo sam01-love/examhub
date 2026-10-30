@@ -1,9 +1,54 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Target, ArrowRight, TrendingUp } from 'lucide-react'
-import { weeklyActivity, subjectPerformance, weakTopics, subjectMeta } from '../data/mockData'
+import { Target, ArrowRight, TrendingUp, Loader2 } from 'lucide-react'
+import { subjectMeta } from '../data/mockData'
+import { useAuth } from '../context/AuthContext'
+import { fetchPerformanceSummary } from '../lib/attemptsApi'
+
+const FALLBACK_WEEKLY = [
+  { day: 'Mon', value: 0 },
+  { day: 'Tue', value: 0 },
+  { day: 'Wed', value: 0 },
+  { day: 'Thu', value: 0 },
+  { day: 'Fri', value: 0 },
+  { day: 'Sat', value: 0 },
+  { day: 'Sun', value: 0 },
+]
 
 export default function Performance() {
-  const maxActivity = Math.max(...weeklyActivity.map((d) => d.value))
+  const { user } = useAuth()
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    if (!user?.id) return
+    setLoading(true)
+    fetchPerformanceSummary(user.id).then((result) => {
+      if (active) {
+        setSummary(result)
+        setLoading(false)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  const weeklyActivity = summary?.weeklyActivity ?? FALLBACK_WEEKLY
+  const subjectPerformance = summary?.subjectPerformance ?? []
+  const weakTopics = summary?.weakTopics ?? []
+  const maxActivity = Math.max(1, ...weeklyActivity.map((d) => d.value))
+  const trendingUp = weeklyActivity.length >= 2 && weeklyActivity[weeklyActivity.length - 1].value >= weeklyActivity[0].value
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
+        <Loader2 className="animate-spin text-primary" size={28} />
+        <p className="text-sm font-medium">Loading your performance…</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
@@ -19,10 +64,12 @@ export default function Performance() {
         <div className="rounded-xl border border-border bg-card p-6 lg:col-span-3">
           <div className="flex items-center justify-between">
             <h2 className="font-heading text-lg font-semibold">Weekly activity</h2>
-            <span className="flex items-center gap-1 text-sm font-semibold text-tertiary">
-              <TrendingUp size={16} />
-              Trending up
-            </span>
+            {trendingUp && (
+              <span className="flex items-center gap-1 text-sm font-semibold text-tertiary">
+                <TrendingUp size={16} />
+                Trending up
+              </span>
+            )}
           </div>
           <div className="mt-7 flex h-40 items-end justify-between gap-3">
             {weeklyActivity.map((d, i) => (
@@ -44,22 +91,28 @@ export default function Performance() {
 
         <div className="rounded-xl border border-border bg-card p-6 lg:col-span-2">
           <h2 className="font-heading text-lg font-semibold">Subject accuracy</h2>
-          <div className="mt-5 space-y-4">
-            {subjectPerformance.map((s) => (
-              <div key={s.subject}>
-                <div className="flex justify-between text-sm">
-                  <span>{s.subject}</span>
-                  <b>{s.accuracy}%</b>
+          {subjectPerformance.length === 0 ? (
+            <p className="mt-5 text-sm text-muted-foreground">
+              Practice a few questions to see your accuracy by subject here.
+            </p>
+          ) : (
+            <div className="mt-5 space-y-4">
+              {subjectPerformance.map((s) => (
+                <div key={s.subject}>
+                  <div className="flex justify-between text-sm">
+                    <span>{subjectMeta[s.subject]?.name || s.subject}</span>
+                    <b>{s.accuracy}%</b>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${s.accuracy >= 85 ? 'bg-tertiary' : 'bg-primary'}`}
+                      style={{ width: `${s.accuracy}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full ${s.accuracy >= 85 ? 'bg-tertiary' : 'bg-primary'}`}
-                    style={{ width: `${s.accuracy}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -70,26 +123,32 @@ export default function Performance() {
           </span>
           <h2 className="font-heading text-lg font-semibold">Weak topics to focus on</h2>
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {weakTopics.map((t) => (
-            <div key={t.topic} className="rounded-xl bg-muted p-5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {subjectMeta[t.subject]?.name || t.subject}
-              </p>
-              <h3 className="mt-1 font-heading text-lg font-semibold">{t.topic}</h3>
-              <div className="mt-4 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{t.questions} questions</span>
-                <span className="font-bold text-destructive">{t.accuracy}% accuracy</span>
+        {weakTopics.length === 0 ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            Once you've answered a few questions per topic, any you're struggling with will show up here.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            {weakTopics.map((t) => (
+              <div key={`${t.subject}-${t.topic}`} className="rounded-xl bg-muted p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {subjectMeta[t.subject]?.name || t.subject}
+                </p>
+                <h3 className="mt-1 font-heading text-lg font-semibold">{t.topic}</h3>
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{t.questions} questions</span>
+                  <span className="font-bold text-destructive">{t.accuracy}% accuracy</span>
+                </div>
+                <Link
+                  to={`/practice/session?subject=${t.subject}&topic=${encodeURIComponent(t.topic)}`}
+                  className="mt-5 flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 font-semibold text-primary-foreground transition hover:bg-primary/90"
+                >
+                  Practice now <ArrowRight size={16} className="ml-2" />
+                </Link>
               </div>
-              <Link
-                to={`/practice/session?subject=${t.subject}&topic=${encodeURIComponent(t.topic)}`}
-                className="mt-5 flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 font-semibold text-primary-foreground transition hover:bg-primary/90"
-              >
-                Practice now <ArrowRight size={16} className="ml-2" />
-              </Link>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )

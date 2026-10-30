@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "predeploy": "npm run build",
+    "predeploy": "vite build --base=/examhub/ && node scripts/copy-404.mjs",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
